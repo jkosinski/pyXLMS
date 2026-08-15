@@ -51,6 +51,9 @@ __all__ = [
     "CrosslinkSpectrumMatch",
     "create_csm",
     "create_csm_min",
+    "MonoLink",
+    "create_mono_link",
+    "create_mono_link_min",
     "ParserResult",
     "create_parser_result",
 ]
@@ -65,5 +68,8 @@ from ._csm import CrosslinkSpectrumMatch
 from ._csm import create_csm
 from ._csm import create_csm_min
 from ._csm import create_crosslink_from_csm
+from ._mono_link import MonoLink
+from ._mono_link import create_mono_link
+from ._mono_link import create_mono_link_min
 from ._parser_result import ParserResult
 from ._parser_result import create_parser_result

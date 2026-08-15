@@ -15,6 +15,7 @@ from pydantic import computed_field
 
 from ._csm import CrosslinkSpectrumMatch
 from ._crosslink import Crosslink
+from ._mono_link import MonoLink
 from ._util import check_input
 
 from typing import Optional
@@ -100,6 +101,15 @@ class ParserResult(BaseModel):
     ] = None
     r"""
     List of parsed crosslinks.
+    """
+    mono_links: Annotated[
+        Optional[List[MonoLink]],
+        Field(frozen=True, description="List of parsed mono-links (dead-ends)."),
+    ] = None
+    r"""
+    List of parsed mono-links (dead-ends). Supplementary to
+    ``crosslink_spectrum_matches`` and ``crosslinks``; it deliberately does not affect
+    ``completeness`` so that existing (crosslink-only) results are unchanged.
     """
     model_config = ConfigDict(
         validate_assignment=True, strict=True, str_strip_whitespace=True
@@ -249,6 +259,9 @@ class ParserResult(BaseModel):
             crosslinks=copy.deepcopy(self.crosslinks)
             if "crosslinks" not in update
             else update["crosslinks"],
+            mono_links=copy.deepcopy(self.mono_links)
+            if "mono_links" not in update
+            else update["mono_links"],
         )
 
     def csms(self, create_copy: bool = True) -> List[CrosslinkSpectrumMatch] | None:
@@ -297,6 +310,29 @@ class ParserResult(BaseModel):
             return copy.deepcopy(self.crosslinks)
         return self.crosslinks
 
+    def mls(self, create_copy: bool = True) -> List[MonoLink] | None:
+        r"""Shorthand function to retrieve mono-links.
+
+        Parameters
+        ----------
+        create_copy : bool, default = True
+            Whether a deep copy of the mono-links should be returned (default) or
+            ``self.mono_links`` directly.
+
+        Returns
+        -------
+        list of MonoLink, or None
+            Returns (a deep copy of) ``self.mono_links``.
+
+        Notes
+        -----
+        Please be aware that by default this explicitly creates a deep copy of the
+        underlying data!
+        """
+        if create_copy:
+            return copy.deepcopy(self.mono_links)
+        return self.mono_links
+
     def display(
         self,
         show_additional_information: bool = False,
@@ -343,6 +379,8 @@ class ParserResult(BaseModel):
         display += f"Identifying Search Engine:            {self.search_engine}\n"
         display += f"Number of Crosslink-Spectrum-Matches: {len(csms) if csms is not None else None}\n"
         display += f"Number of Crosslinks:                 {len(xls) if xls is not None else None}\n"
+        if self.mono_links is not None:
+            display += f"Number of Mono-Links:                 {len(self.mono_links)}\n"
         display = display.strip()
         print(display)
         if return_str:
@@ -354,6 +392,7 @@ def create_parser_result(
     search_engine: str,
     csms: Optional[List[CrosslinkSpectrumMatch]] = None,
     crosslinks: Optional[List[Crosslink]] = None,
+    mono_links: Optional[List[MonoLink]] = None,
 ) -> ParserResult:
     r"""Creates a parser result data structure.
 
@@ -389,4 +428,5 @@ def create_parser_result(
         search_engine=search_engine,
         crosslink_spectrum_matches=csms,
         crosslinks=crosslinks,
+        mono_links=mono_links,
     )

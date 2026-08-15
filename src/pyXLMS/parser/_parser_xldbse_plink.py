@@ -16,6 +16,7 @@ from ..data._parser_result import ParserResult
 from ..data._util import check_input
 from ..data._csm import create_csm
 from ..data._crosslink import create_crosslink
+from ..data._mono_link import create_mono_link
 from ..data._parser_result import create_parser_result
 from ..constants import MODIFICATIONS
 from ._util import format_sequence
@@ -220,6 +221,83 @@ def __parse_proteins_and_position_from_plink(
     }
 
 
+def __parse_mono_link_from_plink(seq: str, proteins: str) -> Dict[str, Any]:
+    r"""Parses proteins and positions from a pLink mono-link (dead-end) result.
+
+    ``seq`` is of the form ``PEPTIDE(pos)`` (one peptide, one site) and ``proteins`` of
+    the form ``acc (site)/acc2 (site2)/``.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_plink()``.
+    """
+    xl_pos = __parse_int(seq.split("(")[1].split(")")[0])
+    proteins_set = set()
+    proteins_list = list()
+    proteins_xl_positions = list()
+    proteins_pep_positions = list()
+    proteins = proteins.strip().rstrip("/")
+    for protein in proteins.split("/"):
+        proteins_set.add(protein.strip())
+    for protein in sorted(proteins_set):
+        acc = protein.split("(")[0].strip()
+        pos = __parse_int(protein.split("(")[1].split(")")[0])
+        proteins_list.append(acc)
+        proteins_xl_positions.append(pos)
+        proteins_pep_positions.append(pos - xl_pos + 1)
+    return {
+        "xl_pos": xl_pos,
+        "proteins": proteins_list,
+        "proteins_xl_positions": proteins_xl_positions,
+        "proteins_pep_positions": proteins_pep_positions,
+    }
+
+
+def __parse_loop_link_from_plink(seq: str, proteins: str) -> Dict[str, Any]:
+    r"""Parses proteins and positions from a pLink loop-link result.
+
+    ``seq`` is of the form ``PEPTIDE(pos1)(pos2)`` (both crosslinked sites on the same
+    peptide) and ``proteins`` of the form ``acc (site1)(site2)/acc2 (site1)(site2)/``.
+    A loop-link is represented as an intra crosslink where alpha and beta refer to the
+    same peptide/protein at the two sites.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_plink()``.
+    """
+    seq_parts = seq.split("(")
+    xl_pos_a = __parse_int(seq_parts[1].split(")")[0])
+    xl_pos_b = __parse_int(seq_parts[2].split(")")[0])
+    proteins_set = set()
+    proteins_list = list()
+    proteins_xl_positions_a = list()
+    proteins_xl_positions_b = list()
+    proteins_pep_positions_a = list()
+    proteins_pep_positions_b = list()
+    proteins = proteins.strip().rstrip("/")
+    for protein in proteins.split("/"):
+        proteins_set.add(protein.strip())
+    for protein in sorted(proteins_set):
+        parts = protein.split("(")
+        acc = parts[0].strip()
+        pos_a = __parse_int(parts[1].split(")")[0])
+        pos_b = __parse_int(parts[2].split(")")[0])
+        proteins_list.append(acc)
+        proteins_xl_positions_a.append(pos_a)
+        proteins_xl_positions_b.append(pos_b)
+        proteins_pep_positions_a.append(pos_a - xl_pos_a + 1)
+        proteins_pep_positions_b.append(pos_b - xl_pos_b + 1)
+    return {
+        "xl_pos_a": xl_pos_a,
+        "xl_pos_b": xl_pos_b,
+        "proteins": proteins_list,
+        "proteins_xl_positions_a": proteins_xl_positions_a,
+        "proteins_xl_positions_b": proteins_xl_positions_b,
+        "proteins_pep_positions_a": proteins_pep_positions_a,
+        "proteins_pep_positions_b": proteins_pep_positions_b,
+    }
+
+
 def __read_plink_cross_linked_peptides_file(
     file: str | BinaryIO, sep: str = ",", decimal: str = ".", **kwargs
 ) -> pd.DataFrame:
@@ -347,7 +425,9 @@ def detect_plink_filetype(
     r"""Detects the pLink-related file type of the data.
 
     Detects whether the input data is a pLink "\*cross-linked_peptides.csv" file or
-    a pLink "\*cross-linked_spectra.csv" file.
+    a pLink "\*\_spectra.csv" file. The cross-, loop-, and mono-linked "\*\_spectra.csv"
+    files share one schema, so all three are reported as "crosslink-spectrum-matches"
+    (``read_plink`` then splits them by their per-row ``Peptide_Type``).
 
     Parameters
     ----------
@@ -364,7 +444,8 @@ def detect_plink_filetype(
     -------
     str
         Returns "crosslinks" if ``file`` is a "\*cross-linked_peptides.csv" or
-        "crosslink-spectrum-matches" if ``file`` is a "\*cross-linked_spectra.csv".
+        "crosslink-spectrum-matches" if ``file`` is a cross-, loop-, or mono-linked
+        "\*\_spectra.csv".
 
     Raises
     ------
@@ -475,7 +556,10 @@ def read_plink(
     Reads a pLink crosslink-spectrum-matches result file "\*cross-linked_spectra.csv"
     in ``.csv`` (comma delimited) format or a pLink crosslinks result file
     "\*cross-linked_peptides.csv" in ``.csv`` (comma delimited) format and
-    returns a ``parser_result``.
+    returns a ``parser_result``. The companion "\*loop-linked_spectra.csv" and
+    "\*mono-linked_spectra.csv" files are read too: loop-links are returned as intra
+    crosslinks (both sites on the same peptide) and mono-links (dead-ends) are
+    returned in the ``mono_links`` field of the ``parser_result``.
 
     Parameters
     ----------
@@ -567,6 +651,7 @@ def read_plink(
     ## data structures
     csms = list()
     crosslinks = list()
+    mono_links = list()
 
     ## handle input
     if not isinstance(files, list):
@@ -630,6 +715,94 @@ def read_plink(
             for _i, row in tqdm(
                 data.iterrows(), total=data.shape[0], desc="Reading pLink CSMs..."
             ):
+                # pLink splits results by link type across three files that share one
+                # schema; branch on Peptide_Type. Mono-links have no partner peptide and
+                # are returned as MonoLink; loop-links are an intra crosslink on a single
+                # peptide (alpha and beta refer to the same peptide/protein).
+                peptide_type = (
+                    str(row["Peptide_Type"]).strip()
+                    if "Peptide_Type" in row
+                    else "Cross-Linked"
+                )
+                if peptide_type == "Mono-Linked":
+                    parsed_mono = __parse_mono_link_from_plink(
+                        seq=str(row["Peptide"]).strip(),
+                        proteins=str(row["Proteins"]).strip(),
+                    )
+                    mono_link = create_mono_link(
+                        peptide=format_sequence(
+                            str(row["Peptide"]).split("(")[0].strip()
+                        ),
+                        xl_position_peptide=parsed_mono["xl_pos"],
+                        proteins=[
+                            protein.strip()
+                            if protein.strip()[: len(decoy_prefix)] != decoy_prefix
+                            else protein.strip()[len(decoy_prefix) :]
+                            for protein in parsed_mono["proteins"]
+                        ],
+                        xl_position_proteins=parsed_mono["proteins_xl_positions"],
+                        decoy=decoy_prefix in " ".join(parsed_mono["proteins"]),
+                        score=__parse_float(row["Score"]),
+                        additional_information={
+                            "source": __serialize_pandas_series(row),
+                            "spectrum_file": spectrum_file_parser(
+                                str(row["Title"]).strip()
+                            ),
+                            "scan_nr": scan_nr_parser(str(row["Title"]).strip()),
+                            "charge": __parse_int(row["Charge"]),
+                            "Evalue": __parse_float(row["Evalue"]),
+                        },
+                    )
+                    mono_links.append(mono_link)
+                    continue
+                if peptide_type == "Loop-Linked":
+                    parsed_loop = __parse_loop_link_from_plink(
+                        seq=str(row["Peptide"]).strip(),
+                        proteins=str(row["Proteins"]).strip(),
+                    )
+                    loop_peptide = format_sequence(
+                        str(row["Peptide"]).split("(")[0].strip()
+                    )
+                    loop_proteins = [
+                        protein.strip()
+                        if protein.strip()[: len(decoy_prefix)] != decoy_prefix
+                        else protein.strip()[len(decoy_prefix) :]
+                        for protein in parsed_loop["proteins"]
+                    ]
+                    loop_decoy = decoy_prefix in " ".join(parsed_loop["proteins"])
+                    csm = create_csm(
+                        peptide_a=loop_peptide,
+                        modifications_a=None,
+                        xl_position_peptide_a=parsed_loop["xl_pos_a"],
+                        proteins_a=loop_proteins,
+                        xl_position_proteins_a=parsed_loop["proteins_xl_positions_a"],
+                        pep_position_proteins_a=parsed_loop["proteins_pep_positions_a"],
+                        score_a=None,
+                        decoy_a=loop_decoy,
+                        peptide_b=loop_peptide,
+                        modifications_b=None,
+                        xl_position_peptide_b=parsed_loop["xl_pos_b"],
+                        proteins_b=list(loop_proteins),
+                        xl_position_proteins_b=parsed_loop["proteins_xl_positions_b"],
+                        pep_position_proteins_b=parsed_loop["proteins_pep_positions_b"],
+                        score_b=None,
+                        decoy_b=loop_decoy,
+                        score=__parse_float(row["Score"]),
+                        spectrum_file=spectrum_file_parser(str(row["Title"]).strip()),
+                        scan_nr=scan_nr_parser(str(row["Title"]).strip()),
+                        charge=__parse_int(row["Charge"]),
+                        rt=None,
+                        im_cv=None,
+                        additional_information={
+                            "source": __serialize_pandas_series(row),
+                            "link_type": "loop-link",
+                            "Evalue": __parse_float(row["Evalue"]),
+                            "Alpha_Evalue": __parse_float(row["Alpha_Evalue"]),
+                            "Beta_Evalue": __parse_float(row["Beta_Evalue"]),
+                        },
+                    )
+                    csms.append(csm)
+                    continue
                 # pre information
                 parsed_modifications = (
                     __parse_modifications_from_plink_modifications_str(
@@ -701,13 +874,14 @@ def read_plink(
                 )
                 csms.append(csm)
     ## check results
-    if len(crosslinks) + len(csms) == 0:
+    if len(crosslinks) + len(csms) + len(mono_links) == 0:
         raise RuntimeError(
-            "No crosslink-spectrum-matches or crosslinks were parsed! If this is unexpected, please file a bug report!"
+            "No crosslink-spectrum-matches, crosslinks, or mono-links were parsed! If this is unexpected, please file a bug report!"
         )
     ## return parser result
     return create_parser_result(
         search_engine="pLink",
         csms=csms if len(csms) > 0 else None,
         crosslinks=crosslinks if len(crosslinks) > 0 else None,
+        mono_links=mono_links if len(mono_links) > 0 else None,
     )
