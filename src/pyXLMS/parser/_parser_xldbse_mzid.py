@@ -256,6 +256,8 @@ def read_mzid(
 
     ## data structures
     csms = list()
+    # spectra with crosslink identifications whose peptides pyteomics could not resolve
+    unresolved_spectra = 0
 
     ## handle input
     if not isinstance(files, list):
@@ -299,6 +301,8 @@ def read_mzid(
             xl_position_proteins_b: List[int] | None = None
             pep_position_proteins_b: List[int] | None = None
             decoy_b: bool | None = decoy
+            # whether a crosslink identification has an unresolved peptide reference
+            unresolved: bool = False
             # set scan
             if "spectrumID" in item:
                 scan = scan_nr_parser(item["spectrumID"])
@@ -322,6 +326,10 @@ def read_mzid(
                             if "cross-link spectrum identification item" in subitem
                             else str(subitem["crosslink spectrum identification item"])
                         )
+                        # pyteomics drops peptides it cannot read, e.g. with an empty
+                        # cvParam, and warns "Ignoring unresolved reference"
+                        if "PeptideSequence" not in subitem:
+                            unresolved = True
                         # if csm_id is not set yet, we parse item as alpha peptide
                         if csm_id is None:
                             csm_id = parsed_csm_id
@@ -425,6 +433,17 @@ def read_mzid(
                     ),
                 )
                 csms.append(csm)
+            elif unresolved:
+                unresolved_spectra += 1
+    ## report skipped spectra
+    if unresolved_spectra > 0 and verbose > 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Skipped {unresolved_spectra} spectra with crosslink identifications whose peptides "
+                "could not be read from the mzIdentML file (unresolved references)!"
+            ),
+            stacklevel=2,
+        )
     ## check results
     if len(csms) == 0:
         raise RuntimeError(
