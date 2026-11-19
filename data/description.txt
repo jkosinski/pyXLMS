@@ -57,6 +57,7 @@ FILETREE                                                                        
 ¦   ¦   Cas9_Residue_Pairs.csv                                                  | Scout         | DSSO
 ¦   ¦   Cas9_Unfiltered_CSMs.csv                                                | Scout         | DSSO
 ¦   ¦   Multi_Mod.csv                                                           | Scout         | DSSO
+¦   ¦   PXD060825_ResPairs1FDR_AD169_excerpt.csv                                | Scout         | unknown
 ¦   ¦                                                                           |               |
 ¦   +---Cas9_HeLa_Cyt_r1                                                        |               |
 ¦   ¦       Cas9_HeLa_Cyt_r1.scout                                              | NOT SUPPORTED |

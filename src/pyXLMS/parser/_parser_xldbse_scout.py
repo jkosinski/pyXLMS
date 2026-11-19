@@ -524,50 +524,104 @@ def __read_scout_csms_filtered(
     return csms
 
 
-def __read_scout_crosslinks(data: pd.DataFrame) -> List[Crosslink]:
+def __get_scout_proteins_and_positions(
+    proteins: str, positions: str
+) -> Tuple[List[str], Optional[List[int]]]:
+    r"""Helper function to pair Scout residue pair proteins with their crosslink positions.
+
+    Scout residue pair results list the unique protein crosslink positions of a peptide,
+    which can be fewer or more than its proteins:
+
+    - One position for several proteins: all proteins share the position.
+    - Several positions for one protein: the peptide occurs several times in the protein,
+      the protein is repeated for every position.
+    - Otherwise the positions cannot be assigned to the proteins unambiguously and ``None``
+      is returned for the positions.
+
+    Parameters
+    ----------
+    proteins : str
+        The Scout protein string, e.g. from column "Alpha protein mapping(s)".
+    positions : str
+        The Scout position string, e.g. from column "Alpha protein(s) position(s)".
+
+    Returns
+    -------
+    tuple of list of str, list of int or None
+        The proteins and their crosslink positions (or ``None``) as parallel lists.
+
+    Raises
+    ------
+    ValueError
+        If a position could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_scout()``.
+    """
+    protein_list = [protein.strip() for protein in str(proteins).split(";")]
+    position_list = [__parse_int(pos) for pos in str(positions).split(";")]
+    if len(protein_list) == len(position_list):
+        return (protein_list, position_list)
+    if len(position_list) == 1:
+        return (protein_list, position_list * len(protein_list))
+    if len(protein_list) == 1:
+        return (protein_list * len(position_list), position_list)
+    return (protein_list, None)
+
+
+def __read_scout_crosslinks(
+    data: pd.DataFrame, verbose: Literal[0, 1, 2] = 1
+) -> List[Crosslink]:
     r"""Reads crosslinks from a Scout crosslink/residue pair result.
 
     Parameters
     ----------
     data : pandas.DataFrame
         The Scout crosslink/residue pair result data.
+    verbose : 0, 1, or 2, default = 1
+        - 0: All warnings are ignored.
+        - 1: Warnings are printed to stdout.
+        - 2: Warnings are treated as errors.
 
     Returns
     -------
     list of Crosslink
         The read crosslinks.
 
+    Raises
+    ------
+    RuntimeError
+        If protein crosslink positions could not be assigned unambiguously (only if ``verbose = 2``).
+
     Notes
     -----
     This function should not be called directly, it is called from ``read_scout()``.
     """
     crosslinks = list()
+    ambiguous_positions = 0
     xl = data.dropna(axis=0, subset=["Alpha peptide", "Beta peptide"])
     for _i, row in tqdm(
         xl.iterrows(), total=xl.shape[0], desc="Reading Scout crosslinks..."
     ):
+        proteins_a, xl_position_proteins_a = __get_scout_proteins_and_positions(
+            row["Alpha protein mapping(s)"], row["Alpha protein(s) position(s)"]
+        )
+        proteins_b, xl_position_proteins_b = __get_scout_proteins_and_positions(
+            row["Beta protein mapping(s)"], row["Beta protein(s) position(s)"]
+        )
+        if xl_position_proteins_a is None or xl_position_proteins_b is None:
+            ambiguous_positions += 1
         crosslink = create_crosslink(
             peptide_a=format_sequence(str(row["Alpha peptide"])),
             xl_position_peptide_a=__parse_int(row["Alpha peptide position"]),
-            proteins_a=[
-                protein.strip()
-                for protein in str(row["Alpha protein mapping(s)"]).split(";")
-            ],
-            xl_position_proteins_a=[
-                __parse_int(pos)
-                for pos in str(row["Alpha protein(s) position(s)"]).split(";")
-            ],
+            proteins_a=proteins_a,
+            xl_position_proteins_a=xl_position_proteins_a,
             decoy_a=get_bool_from_value(row["IsDecoy"]),
             peptide_b=format_sequence(str(row["Beta peptide"])),
             xl_position_peptide_b=__parse_int(row["Beta peptide position"]),
-            proteins_b=[
-                protein.strip()
-                for protein in str(row["Beta protein mapping(s)"]).split(";")
-            ],
-            xl_position_proteins_b=[
-                __parse_int(pos)
-                for pos in str(row["Beta protein(s) position(s)"]).split(";")
-            ],
+            proteins_b=proteins_b,
+            xl_position_proteins_b=xl_position_proteins_b,
             decoy_b=get_bool_from_value(row["IsDecoy"]),
             score=__parse_float(row["Score"]),
             additional_information={
@@ -582,6 +636,16 @@ def __read_scout_crosslinks(data: pd.DataFrame) -> List[Crosslink]:
             },
         )
         crosslinks.append(crosslink)
+    if ambiguous_positions > 0:
+        err_str = (
+            f"Could not assign protein crosslink positions to proteins unambiguously for {ambiguous_positions} "
+            "crosslinks, their protein crosslink positions were set to None! Please use "
+            "transform.reannotate_positions() to annotate them."
+        )
+        if verbose == 1:
+            warnings.warn(RuntimeWarning(err_str), stacklevel=2)
+        elif verbose == 2:
+            raise RuntimeError(err_str)
     return crosslinks
 
 
@@ -665,6 +729,9 @@ def read_scout(
       target or decoy database. The parser assumes that both peptides from a target crosslink are from the target database,
       and vice versa, that both peptides are from the decoy database if it is a decoy crosslink. This leads to only TT and DD
       matches, which needs to be considered for FDR estimation.
+    - When reading crosslinks / residue pairs, Scout reports only the unique protein crosslink positions of a peptide. If all
+      proteins share one position, or one protein has several positions, they are paired accordingly. Otherwise the protein
+      crosslink positions of that peptide are set to ``None`` and should be annotated with ``transform.reannotate_positions()``.
 
     Examples
     --------
@@ -738,7 +805,7 @@ def read_scout(
                 verbose,
             )
         else:
-            crosslinks += __read_scout_crosslinks(data)
+            crosslinks += __read_scout_crosslinks(data, verbose)
 
     ## check results
     if len(crosslinks) + len(csms) == 0:
