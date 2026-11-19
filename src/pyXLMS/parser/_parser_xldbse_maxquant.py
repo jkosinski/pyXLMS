@@ -133,6 +133,48 @@ def parse_modifications_from_maxquant_sequence(
     return parsed_modifications
 
 
+def __get_maxquant_crosslink_index(
+    row: pd.Series, protein: bool, crosslink: int
+) -> int:
+    r"""Helper function to get the protein or peptide crosslink index from MaxQuant/MaxLynx.
+
+    Reads the crosslink index from the columns ``Protein index of Crosslink 1`` or
+    ``Peptide index of Crosslink 1`` (and ``2``). Other MaxQuant/MaxLynx versions write
+    them as ``Pro_InterLink1`` or ``Pep_InterLink1`` (and ``2``) with values terminated by
+    a semicolon, e.g. ``"64;"``, in that case the first index is returned.
+
+    Parameters
+    ----------
+    row : pd.Series
+        The MaxQuant/MaxLynx crosslink-spectrum-match row.
+    protein : bool
+        Whether to read the protein index (``True``) or the peptide index (``False``).
+    crosslink : int
+        Which peptide of the crosslink to read the index for, ``1`` or ``2``.
+
+    Returns
+    -------
+    int
+        The crosslink index (1-based).
+
+    Raises
+    ------
+    KeyError
+        If none of the columns are found.
+    ValueError
+        If the index could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_maxquant()``.
+    """
+    column = f"{'Protein' if protein else 'Peptide'} index of Crosslink {crosslink}"
+    if column in row.index:
+        return __parse_int(row[column])
+    column = f"{'Pro' if protein else 'Pep'}_InterLink{crosslink}"
+    return __parse_int(str(row[column]).split(";")[0])
+
+
 def read_maxquant(
     files: str | List[str] | BinaryIO,
     crosslinker: str,
@@ -258,25 +300,23 @@ def read_maxquant(
                 peptide_a=format_sequence(str(row["Sequence1"])),
                 modifications_a=parse_modifications_from_maxquant_sequence(
                     str(row["Modified sequence1"]),
-                    __parse_int(row["Peptide index of Crosslink 1"]),
+                    __get_maxquant_crosslink_index(row, False, 1),
                     crosslinker,
                     crosslinker_mass,
                     modifications,
                 )
                 if parse_modifications
                 else None,
-                xl_position_peptide_a=__parse_int(row["Peptide index of Crosslink 1"]),
+                xl_position_peptide_a=__get_maxquant_crosslink_index(row, False, 1),
                 proteins_a=[
                     protein_a.strip()
                     if protein_a.strip()[: len(decoy_prefix)] != decoy_prefix
                     else protein_a.strip()[len(decoy_prefix) :]
                 ],
-                xl_position_proteins_a=[
-                    __parse_int(row["Protein index of Crosslink 1"])
-                ],
+                xl_position_proteins_a=[__get_maxquant_crosslink_index(row, True, 1)],
                 pep_position_proteins_a=[
-                    __parse_int(row["Protein index of Crosslink 1"])
-                    - __parse_int(row["Peptide index of Crosslink 1"])
+                    __get_maxquant_crosslink_index(row, True, 1)
+                    - __get_maxquant_crosslink_index(row, False, 1)
                     + 1
                 ],
                 score_a=__parse_float(row["Partial score 1"]),
@@ -284,25 +324,23 @@ def read_maxquant(
                 peptide_b=format_sequence(str(row["Sequence2"])),
                 modifications_b=parse_modifications_from_maxquant_sequence(
                     str(row["Modified sequence2"]),
-                    __parse_int(row["Peptide index of Crosslink 2"]),
+                    __get_maxquant_crosslink_index(row, False, 2),
                     crosslinker,
                     crosslinker_mass,
                     modifications,
                 )
                 if parse_modifications
                 else None,
-                xl_position_peptide_b=__parse_int(row["Peptide index of Crosslink 2"]),
+                xl_position_peptide_b=__get_maxquant_crosslink_index(row, False, 2),
                 proteins_b=[
                     protein_b.strip()
                     if protein_b.strip()[: len(decoy_prefix)] != decoy_prefix
                     else protein_b.strip()[len(decoy_prefix) :]
                 ],
-                xl_position_proteins_b=[
-                    __parse_int(row["Protein index of Crosslink 2"])
-                ],
+                xl_position_proteins_b=[__get_maxquant_crosslink_index(row, True, 2)],
                 pep_position_proteins_b=[
-                    __parse_int(row["Protein index of Crosslink 2"])
-                    - __parse_int(row["Peptide index of Crosslink 2"])
+                    __get_maxquant_crosslink_index(row, True, 2)
+                    - __get_maxquant_crosslink_index(row, False, 2)
                     + 1
                 ],
                 score_b=__parse_float(row["Partial score 2"]),
