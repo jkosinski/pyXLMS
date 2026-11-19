@@ -462,3 +462,27 @@ def test7():
     )
     with pytest.raises(KeyError, match=err_str):
         _ = read_merox(MEROX1, crosslinker="DiSPASO")
+
+
+@pytest.mark.parametrize(
+    "retention_time,expected",
+    [
+        (3099, 3099.0),
+        ("1748", 1748.0),
+        ("1904.59542", 1904.59542),
+        # range of merged scans, e.g. in PRIDE deposits PXD008348 and PXD019215
+        ("1854-1886", 1854.0),
+        ("2241-2241", 2241.0),
+    ],
+)
+def test8(retention_time, expected):
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
+
+    assert __get_merox_retention_time(retention_time) == pytest.approx(expected)
+
+
+def test9():
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
+
+    with pytest.raises(RuntimeError, match="Could not parse retention time from"):
+        _ = __get_merox_retention_time("1854-")

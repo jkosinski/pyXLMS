@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 import pandas as pd
 from tqdm import tqdm
@@ -347,6 +348,47 @@ def __get_merox_spectrum_file(scan_nr_and_file: str) -> str:
     return spectrum_file
 
 
+def __get_merox_retention_time(retention_time: Any) -> float:
+    r"""Helper function to parse the retention time from MeroX.
+
+    Parses the retention time in seconds from MeroX. MeroX reports a range of retention
+    times, e.g. ``"1854-1886"``, for merged scans, in that case the start of the range
+    is returned.
+
+    Parameters
+    ----------
+    retention_time : any
+        The retention time from MeroX e.g. from column "Retention time in sec".
+
+    Returns
+    -------
+    float
+        The parsed retention time in seconds.
+
+    Raises
+    ------
+    RuntimeError
+        If the retention time could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    rt = None
+    try:
+        rt_range = re.fullmatch(
+            r"(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)", str(retention_time).strip()
+        )
+        rt = __parse_float(
+            rt_range.group(1) if rt_range is not None else retention_time
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not parse retention time from {retention_time}!"
+        ) from e
+    return rt
+
+
 def read_merox(
     files: str | List[str] | BinaryIO,
     crosslinker: str,
@@ -403,6 +445,8 @@ def read_merox(
     -----
     Uses ``pepScore1`` as the score for the alpha peptide, ``pepScore2`` as the score of the
     beta peptide, and ``Score`` as the score of the crosslink-spectrum-match.
+    If MeroX reports a range of retention times for merged scans, the start of the range
+    is used.
 
     Warnings
     --------
@@ -525,7 +569,7 @@ def read_merox(
                 spectrum_file=__get_merox_spectrum_file(str(row["Scan number"])),
                 scan_nr=__get_merox_scan_number(str(row["Scan number"])),
                 charge=__parse_int(row["Charge"]),
-                rt=__parse_float(row["Retention time in sec"]),
+                rt=__get_merox_retention_time(row["Retention time in sec"]),
                 im_cv=None,
                 additional_information={
                     "source": __serialize_pandas_series(row),
