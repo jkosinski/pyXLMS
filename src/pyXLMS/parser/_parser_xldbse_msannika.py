@@ -363,11 +363,20 @@ def read_msannika(
                     desc="Reading MS Annika crosslinks...",
                 ):
                     # pre compute values
-                    xl_position_proteins_a = [
-                        __parse_int(position)
-                        for position in str(row["In protein A"]).split(";")
-                    ]
-                    if not __check_positions_okay(xl_position_proteins_a):
+                    # decoy peptides of unfiltered results have no protein (missing values), with
+                    # missing values in a column pandas reads its positions as float, e.g. "712.0"
+                    xl_position_proteins_a = (
+                        [
+                            __parse_int(float(position))
+                            for position in str(row["In protein A"]).split(";")
+                        ]
+                        if not pd.isna(row["In protein A"])
+                        else None
+                    )
+                    if (
+                        xl_position_proteins_a is not None
+                        and not __check_positions_okay(xl_position_proteins_a)
+                    ):
                         if unsafe and not verbose == 2:
                             xl_position_proteins_a = None
                             if verbose == 1:
@@ -383,11 +392,18 @@ def read_msannika(
                                 f"Encountered invalid crosslink position for crosslink with sequence "
                                 f"{format_sequence(str(row['Sequence A']))}-{format_sequence(str(row['Sequence B']))}!"
                             )
-                    xl_position_proteins_b = [
-                        __parse_int(position)
-                        for position in str(row["In protein B"]).split(";")
-                    ]
-                    if not __check_positions_okay(xl_position_proteins_b):
+                    xl_position_proteins_b = (
+                        [
+                            __parse_int(float(position))
+                            for position in str(row["In protein B"]).split(";")
+                        ]
+                        if not pd.isna(row["In protein B"])
+                        else None
+                    )
+                    if (
+                        xl_position_proteins_b is not None
+                        and not __check_positions_okay(xl_position_proteins_b)
+                    ):
                         if unsafe and not verbose == 2:
                             xl_position_proteins_b = None
                             if verbose == 1:
@@ -406,19 +422,31 @@ def read_msannika(
                     # create crosslink
                     crosslink = create_crosslink(
                         peptide_a=format_sequence(str(row["Sequence A"])),
-                        xl_position_peptide_a=__parse_int(row["Position A"]),
+                        # decoy peptides without protein have position -1, the crosslinked
+                        # residue is marked in the sequence, e.g. "GGEAQK[K]ENMEWAELIR"
+                        xl_position_peptide_a=__parse_int(row["Position A"])
+                        if __parse_int(row["Position A"]) > 0
+                        else str(row["Sequence A"]).index("[") + 1,
                         proteins_a=[
                             protein.strip()
                             for protein in str(row["Accession A"]).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Accession A"])
+                        else None,
                         xl_position_proteins_a=xl_position_proteins_a,
                         decoy_a=get_bool_from_value(row["Decoy"]),
                         peptide_b=format_sequence(str(row["Sequence B"])),
-                        xl_position_peptide_b=__parse_int(row["Position B"]),
+                        # decoy peptides without protein have position -1, the crosslinked
+                        # residue is marked in the sequence, e.g. "GGEAQK[K]ENMEWAELIR"
+                        xl_position_peptide_b=__parse_int(row["Position B"])
+                        if __parse_int(row["Position B"]) > 0
+                        else str(row["Sequence B"]).index("[") + 1,
                         proteins_b=[
                             protein.strip()
                             for protein in str(row["Accession B"]).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Accession B"])
+                        else None,
                         xl_position_proteins_b=xl_position_proteins_b,
                         decoy_b=get_bool_from_value(row["Decoy"]),
                         score=__parse_float(row["Best CSM Score"]),
@@ -434,12 +462,21 @@ def read_msannika(
                     desc="Reading MS Annika CSMs...",
                 ):
                     # pre compute values
-                    xl_position_proteins_a = [
-                        __parse_int(position)
-                        + __parse_int(row["Crosslinker Position A"])
-                        for position in str(row["A in protein"]).split(";")
-                    ]
-                    if not __check_positions_okay(xl_position_proteins_a):
+                    # decoy peptides of unfiltered results have no protein (missing values), with
+                    # missing values in a column pandas reads its positions as float, e.g. "712.0"
+                    xl_position_proteins_a = (
+                        [
+                            __parse_int(float(position))
+                            + __parse_int(row["Crosslinker Position A"])
+                            for position in str(row["A in protein"]).split(";")
+                        ]
+                        if not pd.isna(row["A in protein"])
+                        else None
+                    )
+                    if (
+                        xl_position_proteins_a is not None
+                        and not __check_positions_okay(xl_position_proteins_a)
+                    ):
                         if unsafe and not verbose == 2:
                             xl_position_proteins_a = None
                             if verbose == 1:
@@ -453,11 +490,18 @@ def read_msannika(
                             raise RuntimeError(
                                 f"Encountered invalid crosslink position for crosslink-spectrum-match with scan number: {__parse_int(row['First Scan'])}!"
                             )
-                    pep_position_proteins_a = [
-                        __parse_int(position) + 1
-                        for position in str(row["A in protein"]).split(";")
-                    ]
-                    if not __check_positions_okay(pep_position_proteins_a):
+                    pep_position_proteins_a = (
+                        [
+                            __parse_int(float(position)) + 1
+                            for position in str(row["A in protein"]).split(";")
+                        ]
+                        if not pd.isna(row["A in protein"])
+                        else None
+                    )
+                    if (
+                        pep_position_proteins_a is not None
+                        and not __check_positions_okay(pep_position_proteins_a)
+                    ):
                         if unsafe and not verbose == 2:
                             pep_position_proteins_a = None
                             if verbose == 1:
@@ -471,12 +515,19 @@ def read_msannika(
                             raise RuntimeError(
                                 f"Encountered invalid peptide position for crosslink-spectrum-match with scan number: {__parse_int(row['First Scan'])}!"
                             )
-                    xl_position_proteins_b = [
-                        __parse_int(position)
-                        + __parse_int(row["Crosslinker Position B"])
-                        for position in str(row["B in protein"]).split(";")
-                    ]
-                    if not __check_positions_okay(xl_position_proteins_b):
+                    xl_position_proteins_b = (
+                        [
+                            __parse_int(float(position))
+                            + __parse_int(row["Crosslinker Position B"])
+                            for position in str(row["B in protein"]).split(";")
+                        ]
+                        if not pd.isna(row["B in protein"])
+                        else None
+                    )
+                    if (
+                        xl_position_proteins_b is not None
+                        and not __check_positions_okay(xl_position_proteins_b)
+                    ):
                         if unsafe and not verbose == 2:
                             xl_position_proteins_b = None
                             if verbose == 1:
@@ -490,11 +541,18 @@ def read_msannika(
                             raise RuntimeError(
                                 f"Encountered invalid crosslink position for crosslink-spectrum-match with scan number: {__parse_int(row['First Scan'])}!"
                             )
-                    pep_position_proteins_b = [
-                        __parse_int(position) + 1
-                        for position in str(row["B in protein"]).split(";")
-                    ]
-                    if not __check_positions_okay(pep_position_proteins_b):
+                    pep_position_proteins_b = (
+                        [
+                            __parse_int(float(position)) + 1
+                            for position in str(row["B in protein"]).split(";")
+                        ]
+                        if not pd.isna(row["B in protein"])
+                        else None
+                    )
+                    if (
+                        pep_position_proteins_b is not None
+                        and not __check_positions_okay(pep_position_proteins_b)
+                    ):
                         if unsafe and not verbose == 2:
                             pep_position_proteins_b = None
                             if verbose == 1:
@@ -523,7 +581,9 @@ def read_msannika(
                         proteins_a=[
                             protein.strip()
                             for protein in str(row["Accession A"]).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Accession A"])
+                        else None,
                         xl_position_proteins_a=xl_position_proteins_a,
                         pep_position_proteins_a=pep_position_proteins_a,
                         score_a=__parse_float(row["Score Alpha"]),
@@ -541,7 +601,9 @@ def read_msannika(
                         proteins_b=[
                             protein.strip()
                             for protein in str(row["Accession B"]).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Accession B"])
+                        else None,
                         xl_position_proteins_b=xl_position_proteins_b,
                         pep_position_proteins_b=pep_position_proteins_b,
                         score_b=__parse_float(row["Score Beta"]),
