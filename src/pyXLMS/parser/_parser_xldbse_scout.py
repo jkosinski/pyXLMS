@@ -29,6 +29,7 @@ from typing import BinaryIO
 from typing import Dict
 from typing import Tuple
 from typing import List
+from typing import Any
 
 # legacy
 if sys.version_info > (3, 8):
@@ -188,6 +189,64 @@ def parse_modifications_from_scout_sequence(
                 else:
                     parsed_modifications[pos] = modifications[mod_key]
     return parsed_modifications  # ty: ignore[unsound-return-statement]
+
+
+def parse_site_from_scout(
+    peptide: str,
+    peptide_position: Any,
+    proteins: str,
+    protein_positions: str,
+) -> Dict[str, Any]:
+    r"""Parse a Scout peptide, peptide position, proteins, and protein positions into a linked site.
+
+    Parses the fields of one peptide of a Scout filtered crosslink-spectrum-matches or
+    crosslink/residue pair result row, e.g. ``Alpha peptide``, ``Alpha peptide position``,
+    ``Alpha protein mapping(s)``, and ``Alpha protein(s) position(s)``, into its linked site,
+    in a representation that is independent of the pyXLMS data model so it can be reused to
+    build any downstream object.
+
+    Parameters
+    ----------
+    peptide : str
+        The Scout peptide e.g. from column "Alpha peptide".
+    peptide_position : any
+        The crosslink position in the peptide (1-based) e.g. from column "Alpha peptide position".
+    proteins : str
+        The Scout protein string e.g. from column "Alpha protein mapping(s)".
+    protein_positions : str
+        The Scout protein position string e.g. from column "Alpha protein(s) position(s)".
+
+    Returns
+    -------
+    dict of str, any
+        The linked site, a dictionary with keys ``peptide`` (str), ``peptide_position`` (int,
+        1-based, in-peptide), ``proteins`` (list of str, accessions) and ``protein_positions``
+        (list of int, 1-based, absolute; in the order given by Scout).
+
+    Raises
+    ------
+    ValueError
+        If a position could not be parsed.
+
+    Examples
+    --------
+    >>> from pyXLMS.parser import parse_site_from_scout
+    >>> site = parse_site_from_scout(
+    ...     "IDSLSAQLSQLQ [K] QLAAK", 13, "sp|P02545|LMNA", "311"
+    ... )
+    >>> site["peptide"]
+    'IDSLSAQLSQLQKQLAAK'
+    >>> site["protein_positions"]
+    [311]
+    """
+    return {
+        "peptide": format_sequence(str(peptide)),
+        "peptide_position": __parse_int(peptide_position),
+        "proteins": [protein.strip() for protein in str(proteins).split(";")],
+        "protein_positions": [
+            __parse_int(pos) for pos in str(protein_positions).split(";")
+        ],
+    }
 
 
 def __read_scout_csms_unfiltered(
@@ -459,8 +518,20 @@ def __read_scout_csms_filtered(
     for _i, row in tqdm(
         xl.iterrows(), total=xl.shape[0], desc="Reading Scout filtered CSMs..."
     ):
+        site_a = parse_site_from_scout(
+            row["Alpha peptide"],
+            row["Alpha peptide position"],
+            row["Alpha protein mapping(s)"],
+            row["Alpha protein(s) position(s)"],
+        )
+        site_b = parse_site_from_scout(
+            row["Beta peptide"],
+            row["Beta peptide position"],
+            row["Beta protein mapping(s)"],
+            row["Beta protein(s) position(s)"],
+        )
         csm = create_csm(
-            peptide_a=format_sequence(str(row["Alpha peptide"])),
+            peptide_a=site_a["peptide"],
             modifications_a=parse_modifications_fn(
                 row,
                 True,
@@ -471,22 +542,16 @@ def __read_scout_csms_filtered(
             )
             if parse_modifications
             else None,
-            xl_position_peptide_a=__parse_int(row["Alpha peptide position"]),
-            proteins_a=[
-                protein.strip()
-                for protein in str(row["Alpha protein mapping(s)"]).split(";")
-            ],
-            xl_position_proteins_a=[
-                __parse_int(pos)
-                for pos in str(row["Alpha protein(s) position(s)"]).split(";")
-            ],
+            xl_position_peptide_a=site_a["peptide_position"],
+            proteins_a=site_a["proteins"],
+            xl_position_proteins_a=site_a["protein_positions"],
             pep_position_proteins_a=[
                 __parse_int(pos) - __parse_int(row["Alpha peptide position"]) + 1
                 for pos in str(row["Alpha protein(s) position(s)"]).split(";")
             ],
             score_a=None,
             decoy_a=get_bool_from_value(row["IsDecoy"]),
-            peptide_b=format_sequence(str(row["Beta peptide"])),
+            peptide_b=site_b["peptide"],
             modifications_b=parse_modifications_fn(
                 row,
                 False,
@@ -497,15 +562,9 @@ def __read_scout_csms_filtered(
             )
             if parse_modifications
             else None,
-            xl_position_peptide_b=__parse_int(row["Beta peptide position"]),
-            proteins_b=[
-                protein.strip()
-                for protein in str(row["Beta protein mapping(s)"]).split(";")
-            ],
-            xl_position_proteins_b=[
-                __parse_int(pos)
-                for pos in str(row["Beta protein(s) position(s)"]).split(";")
-            ],
+            xl_position_peptide_b=site_b["peptide_position"],
+            proteins_b=site_b["proteins"],
+            xl_position_proteins_b=site_b["protein_positions"],
             pep_position_proteins_b=[
                 __parse_int(pos) - __parse_int(row["Beta peptide position"]) + 1
                 for pos in str(row["Beta protein(s) position(s)"]).split(";")
@@ -546,28 +605,28 @@ def __read_scout_crosslinks(data: pd.DataFrame) -> List[Crosslink]:
     for _i, row in tqdm(
         xl.iterrows(), total=xl.shape[0], desc="Reading Scout crosslinks..."
     ):
+        site_a = parse_site_from_scout(
+            row["Alpha peptide"],
+            row["Alpha peptide position"],
+            row["Alpha protein mapping(s)"],
+            row["Alpha protein(s) position(s)"],
+        )
+        site_b = parse_site_from_scout(
+            row["Beta peptide"],
+            row["Beta peptide position"],
+            row["Beta protein mapping(s)"],
+            row["Beta protein(s) position(s)"],
+        )
         crosslink = create_crosslink(
-            peptide_a=format_sequence(str(row["Alpha peptide"])),
-            xl_position_peptide_a=__parse_int(row["Alpha peptide position"]),
-            proteins_a=[
-                protein.strip()
-                for protein in str(row["Alpha protein mapping(s)"]).split(";")
-            ],
-            xl_position_proteins_a=[
-                __parse_int(pos)
-                for pos in str(row["Alpha protein(s) position(s)"]).split(";")
-            ],
+            peptide_a=site_a["peptide"],
+            xl_position_peptide_a=site_a["peptide_position"],
+            proteins_a=site_a["proteins"],
+            xl_position_proteins_a=site_a["protein_positions"],
             decoy_a=get_bool_from_value(row["IsDecoy"]),
-            peptide_b=format_sequence(str(row["Beta peptide"])),
-            xl_position_peptide_b=__parse_int(row["Beta peptide position"]),
-            proteins_b=[
-                protein.strip()
-                for protein in str(row["Beta protein mapping(s)"]).split(";")
-            ],
-            xl_position_proteins_b=[
-                __parse_int(pos)
-                for pos in str(row["Beta protein(s) position(s)"]).split(";")
-            ],
+            peptide_b=site_b["peptide"],
+            xl_position_peptide_b=site_b["peptide_position"],
+            proteins_b=site_b["proteins"],
+            xl_position_proteins_b=site_b["protein_positions"],
             decoy_b=get_bool_from_value(row["IsDecoy"]),
             score=__parse_float(row["Score"]),
             additional_information={
