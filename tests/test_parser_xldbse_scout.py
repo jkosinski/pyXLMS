@@ -14,6 +14,8 @@ SCOUT_CSMS_10 = "data/scout/Cas10_Unfiltered_CSMs.csv"
 SCOUT_CSMS_F_10 = "data/scout/Cas10_Filtered_CSMs.csv"
 SCOUT_XL_10 = "data/scout/Cas10_Residue_Pairs.csv"
 SCOUT_MM = "data/scout/Multi_Mod.csv"
+# excerpt of public PRIDE deposit PXD043531 (rows copied verbatim)
+SCOUT_CSMS_F_PXD043531 = "data/scout/PXD043531_DSBSO_HEK_Scout_CSMs_excerpt.csv"
 
 
 def test1():
@@ -611,3 +613,48 @@ def test15():
         assert isinstance(xl.additional_information["csm_count"], int)
         assert xl.additional_information["csm_count"] >= 1
     assert crosslinks[0].additional_information["csm_count"] == 26
+
+
+def test16():
+    # filtered CSMs with looplinks written as beta peptide "---" and position -1
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning, match=r"Skipped 2 looplink rows, only crosslinks are read!"
+    ):
+        pr = read_scout(SCOUT_CSMS_F_PXD043531, crosslinker="DSBSO")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 2
+    assert [csm["scan_nr"] for csm in csms] == [1241, 17022]
+
+
+def test17():
+    # filtered CSMs with looplinks without beta peptide
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning, match=r"Skipped 4 looplink rows, only crosslinks are read!"
+    ):
+        pr = read_scout(SCOUT_CSMS_F_9, crosslinker="DSSO")
+    assert len(pr["crosslink-spectrum-matches"]) == 1306
+
+
+def test18():
+    # unfiltered CSMs with looplinks
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning, match=r"Skipped 45673 looplink rows, only crosslinks are read!"
+    ):
+        pr = read_scout(
+            "data/scout2/Cas9_HeLa_Cyt_r1/Cas9_HeLa_Cyt_r1_unfiltered_CSMs.csv",
+            crosslinker="DSBSO",
+        )
+    assert len(pr["crosslink-spectrum-matches"]) == 500
+
+
+def test19():
+    from pyXLMS.parser import read_scout
+
+    pr = read_scout(SCOUT_CSMS_F_PXD043531, crosslinker="DSBSO", verbose=0)
+    assert len(pr["crosslink-spectrum-matches"]) == 2

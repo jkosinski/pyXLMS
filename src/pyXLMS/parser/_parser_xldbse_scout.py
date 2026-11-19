@@ -190,6 +190,57 @@ def parse_modifications_from_scout_sequence(
     return parsed_modifications  # ty: ignore[unsound-return-statement]
 
 
+def __remove_scout_looplinks(
+    data: pd.DataFrame,
+    beta_peptide_column: str,
+    link_type_column: str,
+    verbose: Literal[0, 1, 2],
+) -> pd.DataFrame:
+    r"""Removes looplinks from Scout crosslink-spectrum-matches.
+
+    Looplinks are rows of link type looplink or rows without beta peptide (missing value
+    or ``"---"``). Their number is reported in a warning (unless ``verbose = 0``).
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        The Scout crosslink-spectrum-matches result data.
+    beta_peptide_column : str
+        Name of the beta peptide column, e.g. "Beta peptide".
+    link_type_column : str
+        Name of the link type column, e.g. "Link-Type".
+    verbose : 0, 1, or 2
+        - 0: All warnings are ignored.
+        - 1: Warnings are printed to stdout.
+        - 2: Warnings are printed to stdout.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The data without looplinks.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_scout()``.
+    """
+    is_looplink = data[beta_peptide_column].isna() | (
+        data[beta_peptide_column].astype(str).str.strip() == "---"
+    )
+    if link_type_column in data.columns:
+        is_looplink = is_looplink | (
+            data[link_type_column].astype(str).str.strip().str.lower() == "looplink"
+        )
+    skipped_looplinks = int(is_looplink.sum())
+    if skipped_looplinks > 0 and verbose != 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Skipped {skipped_looplinks} looplink rows, only crosslinks are read!"
+            ),
+            stacklevel=2,
+        )
+    return data[~is_looplink]
+
+
 def __read_scout_csms_unfiltered(
     data: pd.DataFrame,
     crosslinker: str,
@@ -229,6 +280,7 @@ def __read_scout_csms_unfiltered(
     This function should not be called directly, it is called from ``read_scout()``.
     """
     csms = list()
+    data = __remove_scout_looplinks(data, "BetaPeptide", "Type", verbose)
     xl = data.dropna(axis=0, subset=["AlphaPeptide", "BetaPeptide"])
     if "Type" in xl.columns:
         xl = xl[xl["Type"] != "LoopLink"]
@@ -455,6 +507,7 @@ def __read_scout_csms_filtered(
 
     ## create csms
     csms = list()
+    data = __remove_scout_looplinks(data, "Beta peptide", "Link-Type", verbose)
     xl = data.dropna(axis=0, subset=["Alpha peptide", "Beta peptide"])
     for _i, row in tqdm(
         xl.iterrows(), total=xl.shape[0], desc="Reading Scout filtered CSMs..."
