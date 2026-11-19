@@ -10,6 +10,8 @@ import pytest
 MEROX1 = "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.csv"
 MEROX2 = "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.zhrm"
 MEROX3 = "data/merox/cas11.csv"
+# excerpt of public PRIDE deposit PXD025064 (rows copied verbatim)
+MEROX4 = "data/merox/PXD025064_AGAL_300DSBU_Fr7_excerpt.zhrm"
 
 
 def test1():
@@ -462,3 +464,63 @@ def test7():
     )
     with pytest.raises(KeyError, match=err_str):
         _ = read_merox(MEROX1, crosslinker="DiSPASO")
+
+
+def test8():
+    # protein-terminal peptides: "{" protein N-terminus, "}" protein C-terminus
+    from pyXLMS.parser import read_merox
+    from pyXLMS.transform import modifications_to_str as mts
+
+    pr = read_merox(MEROX4, crosslinker="DSBU")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+
+    # [SPMFEKK] K6 - [KYLLS} K1
+    csm = csms[0]
+    assert csm["alpha_peptide"] == "KYLLS"
+    assert csm["alpha_peptide_crosslink_position"] == 1
+    assert csm["alpha_proteins_crosslink_positions"] == [135]
+    assert csm["alpha_proteins_peptide_positions"] == [135]
+    assert csm["beta_peptide"] == "SPMFEKK"
+    assert csm["beta_proteins_crosslink_positions"] == [127]
+
+    # {MIIYGVYIVSK] {0 - [TGISNIDK} K8
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "MIIYGVYIVSK"
+    assert csm["alpha_peptide_crosslink_position"] == 1
+    assert mts(csm["alpha_modifications"]) == "(0:[DSBU|196.08479231])"
+    assert csm["alpha_proteins"] == ["TRAPPC4"]
+    assert csm["alpha_proteins_crosslink_positions"] == [1]
+    assert csm["alpha_proteins_peptide_positions"] == [1]
+    assert csm["beta_peptide"] == "TGISNIDK"
+    assert csm["beta_peptide_crosslink_position"] == 8
+    assert csm["beta_proteins_crosslink_positions"] == [219]
+    assert csm["beta_proteins_peptide_positions"] == [212]
+    assert csm["scan_nr"] == 21256
+
+    # [LQELLAQVEKTGISNIDK} K10 - {MIIYGVYIVSK] {0
+    csm = csms[2]
+    assert csm["alpha_peptide"] == "LQELLAQVEKTGISNIDK"
+    assert csm["alpha_proteins_crosslink_positions"] == [211]
+    assert csm["beta_peptide"] == "MIIYGVYIVSK"
+    assert csm["beta_peptide_crosslink_position"] == 1
+    assert csm["beta_proteins_crosslink_positions"] == [1]
+    assert csm["beta_proteins_peptide_positions"] == [1]
+
+
+@pytest.mark.parametrize(
+    "position_str,from_position,sequence,xl_position,pep_position",
+    [
+        ("K2", 869, "[GKSDNVPSEEVVK]", 2, 869),
+        ("{0", 0, "{MIIYGVYIVSK]", 1, 1),
+        # protein N-terminal peptide crosslinked at a residue, e.g. in PRIDE deposit PXD008348
+        ("K3", 0, "{MSKTAVK]", 3, 1),
+        ("K1", 135, "[KYLLS}", 1, 135),
+    ],
+)
+def test9(position_str, from_position, sequence, xl_position, pep_position):
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_crosslink_position
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_peptide_position
+
+    assert __get_merox_crosslink_position(position_str) == xl_position
+    assert __get_merox_peptide_position(from_position, sequence) == pep_position
