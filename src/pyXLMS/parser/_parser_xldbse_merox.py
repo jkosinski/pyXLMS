@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import re
+import warnings
 import zipfile
 import pandas as pd
 from tqdm import tqdm
@@ -112,7 +113,13 @@ def __read_merox_file(
             )
     if not isinstance(file, str):
         file.seek(0)
-    return pd.read_csv(file, sep=sep, decimal=decimal, low_memory=False, **kwargs)  # ty: ignore[unsound-return-statement]
+    # rows of exported tables can end with a separator, without index_col=False pandas
+    # would use the first column as index and shift all columns by one, the empty last
+    # field is dropped
+    kwargs.setdefault("index_col", False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", pd.errors.ParserWarning)
+        return pd.read_csv(file, sep=sep, decimal=decimal, low_memory=False, **kwargs)  # ty: ignore[unsound-return-statement]
 
 
 def __get_merox_sequence(
@@ -463,7 +470,9 @@ def read_merox(
     Notes
     -----
     Uses ``pepScore1`` as the score for the alpha peptide, ``pepScore2`` as the score of the
-    beta peptide, and ``Score`` as the score of the crosslink-spectrum-match.
+    beta peptide, and ``Score`` as the score of the crosslink-spectrum-match. Tables exported
+    by older versions of MeroX and by StavroX have no ``pepScore1`` and ``pepScore2``, the
+    peptide scores are ``None`` for these.
     If MeroX reports a range of merged scans, the first scan number is used. If the scan
     number is reported without a spectrum file, the spectrum file is an empty string.
 
@@ -554,7 +563,9 @@ def read_merox(
                     - 1
                 ],
                 pep_position_proteins_a=[__parse_int(row["From"])],
-                score_a=__parse_float(row["pepScore1"]),
+                score_a=__parse_float(row["pepScore1"])
+                if "pepScore1" in row.index
+                else None,
                 decoy_a=__get_merox_protein(str(row["Protein 1"]))[0].startswith(
                     decoy_prefix
                 ),
@@ -580,7 +591,9 @@ def read_merox(
                     - 1
                 ],
                 pep_position_proteins_b=[__parse_int(row["From.1"])],
-                score_b=__parse_float(row["pepScore2"]),
+                score_b=__parse_float(row["pepScore2"])
+                if "pepScore2" in row.index
+                else None,
                 decoy_b=__get_merox_protein(str(row["Protein 2"]))[0].startswith(
                     decoy_prefix
                 ),
@@ -592,10 +605,10 @@ def read_merox(
                 im_cv=None,
                 additional_information={
                     "source": __serialize_pandas_series(row),
-                    "xLinkScore": row["xLinkScore"],
+                    "xLinkScore": row.get("xLinkScore"),
                     "Protein 1": row["Protein 1"],
                     "Protein 2": row["Protein 2"],
-                    "MS1intensity": row["MS1intensity"],
+                    "MS1intensity": row.get("MS1intensity"),
                 },
             )
             csms.append(csm)

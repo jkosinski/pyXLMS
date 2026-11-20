@@ -9,6 +9,7 @@ FILETREE                                                                        
 ¦                                                                               |               |
 +---merox                                                                       |               |
 ¦       cas11.csv                                                               | MeroX         | DSS
+¦       PXD010070_KMN-C18_F1_excerpt.csv                                        | MeroX         | DSBU
 ¦       PXD008348_Npl3HMT1_DSSO_R1_excerpt.zhrm                                 | MeroX         | DSSO
 ¦       PXD015080_N29_excerpt.zhrm                                              | MeroX         | HSAKp
 ¦       XLpeplib_Beveridge_QEx-HFX_DSS_R1.csv                                   | MeroX         | DSS
