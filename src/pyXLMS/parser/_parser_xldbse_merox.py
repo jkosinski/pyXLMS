@@ -408,6 +408,54 @@ def __get_merox_spectrum_file(scan_nr_and_file: str) -> str:
     return spectrum_file
 
 
+def __get_merox_retention_time(
+    retention_time: Any, decimal: str = "."
+) -> Optional[float]:
+    r"""Helper function to parse the retention time from MeroX.
+
+    Parses the retention time in seconds from MeroX. MeroX reports a range of retention
+    times, e.g. ``"1854-1886"``, for merged scans, in that case the start of the range
+    is returned. Some exported tables leave the retention time empty, e.g. ``" "``, in
+    that case ``None`` is returned.
+
+    Parameters
+    ----------
+    retention_time : any
+        The retention time from MeroX e.g. from column "Retention time in sec".
+    decimal : str, default = "."
+        Character to recognize as decimal point.
+
+    Returns
+    -------
+    float, or None
+        The parsed retention time in seconds, or None if no retention time is given.
+
+    Raises
+    ------
+    RuntimeError
+        If the retention time could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    value = str(retention_time).strip()
+    if value == "":
+        return None
+    # pandas does not apply the decimal character to columns that contain ranges
+    if decimal != ".":
+        value = value.replace(decimal, ".")
+    rt = None
+    try:
+        rt_range = re.fullmatch(r"(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)", value)
+        rt = __parse_float(rt_range.group(1) if rt_range is not None else value)
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not parse retention time from {retention_time}!"
+        ) from e
+    return rt
+
+
 def read_merox(
     files: str | List[str] | BinaryIO,
     crosslinker: str,
@@ -466,6 +514,8 @@ def read_merox(
     beta peptide, and ``Score`` as the score of the crosslink-spectrum-match.
     If MeroX reports a range of merged scans, the first scan number is used. If the scan
     number is reported without a spectrum file, the spectrum file is an empty string.
+    If MeroX reports a range of retention times for merged scans, the start of the range
+    is used.
 
     Warnings
     --------
@@ -588,7 +638,7 @@ def read_merox(
                 spectrum_file=__get_merox_spectrum_file(str(row["Scan number"])),
                 scan_nr=__get_merox_scan_number(str(row["Scan number"])),
                 charge=__parse_int(row["Charge"]),
-                rt=__parse_float(row["Retention time in sec"]),
+                rt=__get_merox_retention_time(row["Retention time in sec"], decimal),
                 im_cv=None,
                 additional_information={
                     "source": __serialize_pandas_series(row),

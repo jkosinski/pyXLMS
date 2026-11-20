@@ -556,3 +556,61 @@ def test11():
         _ = __get_merox_scan_number('scan File:"run.raw"')
     with pytest.raises(RuntimeError, match="Could not scan number from"):
         _ = __get_merox_scan_number('Locus:1.1.1.1409.10 File:"run.wiff"')
+
+
+@pytest.mark.parametrize(
+    "retention_time,expected",
+    [
+        (3099, 3099.0),
+        ("1748", 1748.0),
+        ("1904.59542", 1904.59542),
+        # range of merged scans, e.g. in PRIDE deposits PXD008348 and PXD019215
+        ("1854-1886", 1854.0),
+        ("2241-2241", 2241.0),
+        # empty in exported tables, e.g. in PRIDE deposits PXD012127 and PXD017299
+        (" ", None),
+    ],
+)
+def test12(retention_time, expected):
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
+
+    if expected is None:
+        assert __get_merox_retention_time(retention_time) is None
+    else:
+        assert __get_merox_retention_time(retention_time) == pytest.approx(expected)
+
+
+def test13():
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
+
+    with pytest.raises(RuntimeError, match="Could not parse retention time from"):
+        _ = __get_merox_retention_time("1854-")
+
+
+@pytest.mark.parametrize(
+    "retention_time,expected",
+    [
+        ("1854,5-1886,5", 1854.5),
+        ("1904,5", 1904.5),
+        (1904.5, 1904.5),
+    ],
+)
+def test19(retention_time, expected):
+    # retention times with decimal comma
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
+
+    assert __get_merox_retention_time(retention_time, ",") == pytest.approx(expected)
+
+
+def test20(tmp_path):
+    # pandas does not apply the decimal comma to a column with retention time ranges
+    import pandas as pd
+    from pyXLMS.parser import read_merox
+
+    data = pd.read_csv(MEROX1, sep=";").head(2)
+    data["Retention time in sec"] = ["1854,5-1886,5", "1904,5"]
+    file = tmp_path / "decimal_comma.csv"
+    data.to_csv(file, sep=";", index=False, decimal=",")
+    pr = read_merox(str(file), crosslinker="DSS", decimal=",")
+    csms = pr["crosslink-spectrum-matches"]
+    assert [csm["retention_time"] for csm in csms] == pytest.approx([1854.5, 1904.5])
