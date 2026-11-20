@@ -46,6 +46,7 @@ __all__ = [
     "detect_plink_filetype",
     "detect_scout_filetype",
     "parse_modifications_from_scout_sequence",
+    "parse_site_from_scout",
     "pyxlms_modification_str_parser",
     "parse_modifications_from_maxquant_sequence",
     "read",
@@ -80,6 +81,7 @@ from ._parser_xldbse_merox import parse_site_from_merox
 from ._parser_xldbse_plink import parse_spectrum_file_from_plink
 from ._parser_xldbse_plink import detect_plink_filetype
 from ._parser_xldbse_scout import detect_scout_filetype
+from ._parser_xldbse_scout import parse_site_from_scout
 from ._parser_xldbse_scout import parse_modifications_from_scout_sequence
 from ._parser_xldbse_custom import pyxlms_modification_str_parser
 from ._parser_xldbse_maxquant import parse_modifications_from_maxquant_sequence
