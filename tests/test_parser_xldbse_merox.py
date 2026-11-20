@@ -17,6 +17,8 @@ MEROX5 = "data/merox/PXD015080_N29_excerpt.zhrm"
 MEROX7 = "data/merox/PXD025064_AGAL_300DSBU_Fr7_excerpt.zhrm"
 # excerpt of public PRIDE deposit PXD044723 (rows copied verbatim)
 MEROX8 = "data/merox/PXD044723_XLDID2_01_excerpt.zhrm"
+# excerpt of public PRIDE deposit PXD010070 (exported table, rows copied verbatim)
+MEROX6 = "data/merox/PXD010070_KMN-C18_F1_excerpt.csv"
 
 
 def test1():
@@ -706,3 +708,24 @@ def test17():
 
     pr = read_merox(MEROX1, crosslinker="DSS")
     assert len(pr["crosslink-spectrum-matches"]) == 93
+
+
+def test18():
+    # exported table of an older MeroX version: rows end with a separator, no peptide scores
+    from pyXLMS.parser import read_merox
+
+    pr = read_merox(MEROX6, crosslinker="DSBU")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 2
+    csm = csms[0]
+    assert csm["alpha_peptide"] == "KWYPLRPK"
+    assert csm["alpha_proteins"] == ["Nsl1"]
+    assert csm["alpha_proteins_crosslink_positions"] == [268]
+    assert csm["alpha_score"] is None
+    assert csm["beta_peptide"] == "LLGEEIEYLKR"
+    assert csm["beta_proteins_crosslink_positions"] == [227]
+    assert csm["beta_score"] is None
+    assert csm["score"] == pytest.approx(91.0)
+    assert csm["scan_nr"] == 10001
+    assert csm["retention_time"] == pytest.approx(3379.0815)
+    assert csm["charge"] == 4
