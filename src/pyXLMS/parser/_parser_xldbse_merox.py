@@ -530,6 +530,79 @@ def __get_merox_retention_time(
     return rt
 
 
+def parse_site_from_merox(
+    peptide: str,
+    protein: str,
+    peptide_start: Any,
+    position: str,
+    parse_modifications: bool = True,
+    modifications: Dict[str, Dict[str, Any]] = MEROX_MODIFICATION_MAPPING,
+) -> Dict[str, Any]:
+    r"""Parse a MeroX peptide, protein, start, and linkage position into a linked site.
+
+    Parses the fields of one peptide of a MeroX result row, e.g. ``Peptide 1``,
+    ``Protein 1``, ``From``, and ``best linkage position peptide 1``, into its linked
+    site, in a representation that is independent of the pyXLMS data model so it can
+    be reused to build any downstream object.
+
+    Parameters
+    ----------
+    peptide : str
+        The MeroX sequence e.g. from column "Peptide 1" or "Peptide2".
+    protein : str
+        The MeroX protein string e.g. from column "Protein 1" or "Protein 2".
+    peptide_start : any
+        The position of the peptide in the protein e.g. from column "From".
+    position : str
+        The MeroX linkage position e.g. from column "best linkage position peptide 1".
+    parse_modifications : bool, default = True
+        Whether or not unknown symbols in the sequence should raise an error.
+    modifications: dict of str, dict of str, any, default = ``constants.MEROX_MODIFICATION_MAPPING``
+        Mapping of modification symbols to their amino acids and modifications. Please refer to
+        ``constants.MEROX_MODIFICATION_MAPPING`` for examples.
+
+    Returns
+    -------
+    dict of str, any
+        The linked site, a dictionary with keys ``peptide`` (str), ``peptide_position`` (int,
+        1-based, in-peptide), ``proteins`` (list of str, accessions) and ``protein_positions``
+        (list of int, 1-based, absolute; parallel to ``proteins``). MeroX reports a single
+        protein per peptide.
+
+    Raises
+    ------
+    KeyError
+        If one of the symbols in the sequence could not be resolved/an unknown modification is
+        encountered (only if ``parse_modifications = True``).
+    RuntimeError
+        If the linkage position could not be parsed.
+    ValueError
+        If the peptide start could not be parsed.
+
+    Examples
+    --------
+    >>> from pyXLMS.parser import parse_site_from_merox
+    >>> site = parse_site_from_merox("[VKYVTEGmR]", ">Cas9", 531, "K2")
+    >>> site["peptide"]
+    'VKYVTEGMR'
+    >>> site["protein_positions"]
+    [532]
+    """
+    peptide_position = __get_merox_crosslink_position(str(position))
+    return {
+        "peptide": __get_merox_sequence(
+            str(peptide), parse_modifications, modifications
+        ),
+        "peptide_position": peptide_position,
+        "proteins": __get_merox_protein(str(protein)),
+        "protein_positions": [
+            __get_merox_peptide_position(peptide_start, str(peptide))
+            + peptide_position
+            - 1
+        ],
+    }
+
+
 def read_merox(
     files: str | List[str] | BinaryIO,
     crosslinker: str,
@@ -667,11 +740,26 @@ def read_merox(
             if str(row["Peptide2"]).strip() == "1":
                 skipped_looplinks += 1
                 continue
+            # parse linked sites
+            site_a = parse_site_from_merox(
+                row["Peptide 1"],
+                row["Protein 1"],
+                row["From"],
+                row["best linkage position peptide 1"],
+                parse_modifications,
+                modifications,
+            )
+            site_b = parse_site_from_merox(
+                row["Peptide2"],
+                row["Protein 2"],
+                row["From.1"],
+                row["best linkage position peptide 2"],
+                parse_modifications,
+                modifications,
+            )
             # create crosslink
             csm = create_csm(
-                peptide_a=__get_merox_sequence(
-                    str(row["Peptide 1"]), parse_modifications, modifications
-                ),
+                peptide_a=site_a["peptide"],
                 modifications_a=__get_merox_modifications(
                     str(row["Peptide 1"]),
                     __get_merox_position(str(row["best linkage position peptide 1"])),
@@ -681,29 +769,17 @@ def read_merox(
                 )
                 if parse_modifications
                 else None,
-                xl_position_peptide_a=__get_merox_crosslink_position(
-                    str(row["best linkage position peptide 1"])
-                ),
-                proteins_a=__get_merox_protein(str(row["Protein 1"])),
-                xl_position_proteins_a=[
-                    __get_merox_peptide_position(row["From"], str(row["Peptide 1"]))
-                    + __get_merox_crosslink_position(
-                        str(row["best linkage position peptide 1"])
-                    )
-                    - 1
-                ],
+                xl_position_peptide_a=site_a["peptide_position"],
+                proteins_a=site_a["proteins"],
+                xl_position_proteins_a=site_a["protein_positions"],
                 pep_position_proteins_a=[
                     __get_merox_peptide_position(row["From"], str(row["Peptide 1"]))
                 ],
                 score_a=__parse_float(row["pepScore1"])
                 if "pepScore1" in row.index
                 else None,
-                decoy_a=__get_merox_protein(str(row["Protein 1"]))[0].startswith(
-                    decoy_prefix
-                ),
-                peptide_b=__get_merox_sequence(
-                    str(row["Peptide2"]), parse_modifications, modifications
-                ),
+                decoy_a=site_a["proteins"][0].startswith(decoy_prefix),
+                peptide_b=site_b["peptide"],
                 modifications_b=__get_merox_modifications(
                     str(row["Peptide2"]),
                     __get_merox_position(str(row["best linkage position peptide 2"])),
@@ -713,26 +789,16 @@ def read_merox(
                 )
                 if parse_modifications
                 else None,
-                xl_position_peptide_b=__get_merox_crosslink_position(
-                    str(row["best linkage position peptide 2"])
-                ),
-                proteins_b=__get_merox_protein(str(row["Protein 2"])),
-                xl_position_proteins_b=[
-                    __get_merox_peptide_position(row["From.1"], str(row["Peptide2"]))
-                    + __get_merox_crosslink_position(
-                        str(row["best linkage position peptide 2"])
-                    )
-                    - 1
-                ],
+                xl_position_peptide_b=site_b["peptide_position"],
+                proteins_b=site_b["proteins"],
+                xl_position_proteins_b=site_b["protein_positions"],
                 pep_position_proteins_b=[
                     __get_merox_peptide_position(row["From.1"], str(row["Peptide2"]))
                 ],
                 score_b=__parse_float(row["pepScore2"])
                 if "pepScore2" in row.index
                 else None,
-                decoy_b=__get_merox_protein(str(row["Protein 2"]))[0].startswith(
-                    decoy_prefix
-                ),
+                decoy_b=site_b["proteins"][0].startswith(decoy_prefix),
                 score=__parse_float(row["Score"]),
                 spectrum_file=__get_merox_spectrum_file(str(row["Scan number"])),
                 scan_nr=__get_merox_scan_number(str(row["Scan number"])),
