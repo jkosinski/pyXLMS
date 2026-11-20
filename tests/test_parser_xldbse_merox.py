@@ -15,6 +15,8 @@ MEROX4 = "data/merox/PXD008348_Npl3HMT1_DSSO_R1_excerpt.zhrm"
 MEROX5 = "data/merox/PXD015080_N29_excerpt.zhrm"
 # excerpt of public PRIDE deposit PXD025064 (rows copied verbatim)
 MEROX7 = "data/merox/PXD025064_AGAL_300DSBU_Fr7_excerpt.zhrm"
+# excerpt of public PRIDE deposit PXD044723 (rows copied verbatim)
+MEROX8 = "data/merox/PXD044723_XLDID2_01_excerpt.zhrm"
 
 
 def test1():
@@ -676,3 +678,31 @@ def test15(position_str, from_position, sequence, xl_position, pep_position):
 
     assert __get_merox_crosslink_position(position_str) == xl_position
     assert __get_merox_peptide_position(from_position, sequence) == pep_position
+
+
+def test16():
+    # 3 crosslinks, 2 monolinks (Peptide2 "0") and 2 looplinks (Peptide2 "1")
+    from pyXLMS.parser import read_merox
+
+    with pytest.warns(
+        RuntimeWarning,
+        match=r"Skipped 2 monolink and 2 looplink rows, only crosslinks are read!",
+    ):
+        pr = read_merox(MEROX8, crosslinker="DSBU")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert [csm["scan_nr"] for csm in csms] == [1581, 1593, 2978]
+    assert [csm["beta_peptide"] for csm in csms] == ["LIKSR", "LIKSR", "LIKSR"]
+    assert [csm["beta_proteins_crosslink_positions"] for csm in csms] == [
+        [364],
+        [365],
+        [364],
+    ]
+
+
+def test17():
+    # no warning if there are no monolinks or looplinks (warnings are errors in pytest.ini)
+    from pyXLMS.parser import read_merox
+
+    pr = read_merox(MEROX1, crosslinker="DSS")
+    assert len(pr["crosslink-spectrum-matches"]) == 93

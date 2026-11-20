@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import re
+import warnings
 import zipfile
 import pandas as pd
 from tqdm import tqdm
@@ -583,6 +584,8 @@ def read_merox(
     number is reported without a spectrum file, the spectrum file is an empty string.
     If MeroX reports a range of retention times for merged scans, the start of the range
     is used.
+    Monolinks (``Peptide2`` is ``0``) and looplinks (``Peptide2`` is ``1``) are skipped and their
+    number is reported in a warning.
 
     Warnings
     --------
@@ -632,6 +635,8 @@ def read_merox(
 
     ## data structures
     csms = list()
+    skipped_monolinks = 0
+    skipped_looplinks = 0
 
     ## handle input
     if not isinstance(files, list):
@@ -647,6 +652,13 @@ def read_merox(
             total=data.shape[0],
             desc="Reading MeroX CSMs...",
         ):
+            # skip monolinks ("0") and looplinks ("1"), pyXLMS only models crosslinks
+            if str(row["Peptide2"]).strip() == "0":
+                skipped_monolinks += 1
+                continue
+            if str(row["Peptide2"]).strip() == "1":
+                skipped_looplinks += 1
+                continue
             # create crosslink
             csm = create_csm(
                 peptide_a=__get_merox_sequence(
@@ -724,6 +736,15 @@ def read_merox(
                 },
             )
             csms.append(csm)
+    ## report skipped rows
+    if skipped_monolinks + skipped_looplinks > 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Skipped {skipped_monolinks} monolink and {skipped_looplinks} looplink "
+                "rows, only crosslinks are read!"
+            ),
+            stacklevel=2,
+        )
     ## check results
     if len(csms) == 0:
         raise RuntimeError(
