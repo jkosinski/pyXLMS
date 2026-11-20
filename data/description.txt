@@ -125,6 +125,7 @@ FILETREE                                                                        
 ¦       Cas9_HeLa_Cyt_r1.pdResult                                               | XlinkX        | DSBSO
 ¦       Cas9_HeLa_Cyt_r2.pdResult                                               | XlinkX        | DSBSO
 ¦       Cas9_HeLa_Cyt_r3.pdResult                                               | XlinkX        | DSBSO
+¦       PXD014584_Nuc_S60D10_CSMs_excerpt.txt                                   | XlinkX        | DSSO
 ¦       PXD007513_NPM1_XL_CSMs_excerpt.txt                                      | XlinkX        | DSSO
 ¦       PXD031033_CSMs_excerpt.txt                                              | XlinkX        | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.mzid                                  | mzIdentML     | DSSO

@@ -512,16 +512,21 @@ def read_xlinkx(
                             __parse_int(row["Crosslinker Position A"]),
                             format_sequence(str(row["Sequence A"]).strip()),
                         ),
+                        # decoys of older versions have no protein and a placeholder position
                         proteins_a=[
                             protein.strip()
                             for protein in str(row["Protein Accession A"]).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Protein Accession A"])
+                        else None,
                         xl_position_proteins_a=[
                             adjust_protein_position(__parse_int(position))
                             for position in str(
                                 row["Leading Protein Position A"]
                             ).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Protein Accession A"])
+                        else None,
                         pep_position_proteins_a=[
                             adjust_protein_position(__parse_int(position))
                             - adjust_crosslink_position(
@@ -532,7 +537,9 @@ def read_xlinkx(
                             for position in str(
                                 row["Leading Protein Position A"]
                             ).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Protein Accession A"])
+                        else None,
                         score_a=None,
                         decoy_a=get_bool_from_value(row["Is Decoy"])
                         if "Is Decoy" in col_names
@@ -551,13 +558,17 @@ def read_xlinkx(
                         proteins_b=[
                             protein.strip()
                             for protein in str(row["Protein Accession B"]).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Protein Accession B"])
+                        else None,
                         xl_position_proteins_b=[
                             adjust_protein_position(__parse_int(position))
                             for position in str(
                                 row["Leading Protein Position B"]
                             ).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Protein Accession B"])
+                        else None,
                         pep_position_proteins_b=[
                             adjust_protein_position(__parse_int(position))
                             - adjust_crosslink_position(
@@ -568,7 +579,9 @@ def read_xlinkx(
                             for position in str(
                                 row["Leading Protein Position B"]
                             ).split(";")
-                        ],
+                        ]
+                        if not pd.isna(row["Protein Accession B"])
+                        else None,
                         score_b=None,
                         decoy_b=get_bool_from_value(row["Is Decoy"])
                         if "Is Decoy" in col_names
