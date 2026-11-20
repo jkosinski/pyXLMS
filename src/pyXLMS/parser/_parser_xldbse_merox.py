@@ -348,7 +348,9 @@ def __get_merox_spectrum_file(scan_nr_and_file: str) -> str:
     return spectrum_file
 
 
-def __get_merox_retention_time(retention_time: Any) -> Optional[float]:
+def __get_merox_retention_time(
+    retention_time: Any, decimal: str = "."
+) -> Optional[float]:
     r"""Helper function to parse the retention time from MeroX.
 
     Parses the retention time in seconds from MeroX. MeroX reports a range of retention
@@ -360,6 +362,8 @@ def __get_merox_retention_time(retention_time: Any) -> Optional[float]:
     ----------
     retention_time : any
         The retention time from MeroX e.g. from column "Retention time in sec".
+    decimal : str, default = "."
+        Character to recognize as decimal point.
 
     Returns
     -------
@@ -375,16 +379,16 @@ def __get_merox_retention_time(retention_time: Any) -> Optional[float]:
     -----
     This function should not be called directly, it is called from ``read_merox()``.
     """
-    if str(retention_time).strip() == "":
+    value = str(retention_time).strip()
+    if value == "":
         return None
+    # pandas does not apply the decimal character to columns that contain ranges
+    if decimal != ".":
+        value = value.replace(decimal, ".")
     rt = None
     try:
-        rt_range = re.fullmatch(
-            r"(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)", str(retention_time).strip()
-        )
-        rt = __parse_float(
-            rt_range.group(1) if rt_range is not None else retention_time
-        )
+        rt_range = re.fullmatch(r"(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)", value)
+        rt = __parse_float(rt_range.group(1) if rt_range is not None else value)
     except Exception as e:
         raise RuntimeError(
             f"Could not parse retention time from {retention_time}!"
@@ -572,7 +576,7 @@ def read_merox(
                 spectrum_file=__get_merox_spectrum_file(str(row["Scan number"])),
                 scan_nr=__get_merox_scan_number(str(row["Scan number"])),
                 charge=__parse_int(row["Charge"]),
-                rt=__get_merox_retention_time(row["Retention time in sec"]),
+                rt=__get_merox_retention_time(row["Retention time in sec"], decimal),
                 im_cv=None,
                 additional_information={
                     "source": __serialize_pandas_series(row),

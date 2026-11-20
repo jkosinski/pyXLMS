@@ -491,3 +491,32 @@ def test9():
 
     with pytest.raises(RuntimeError, match="Could not parse retention time from"):
         _ = __get_merox_retention_time("1854-")
+
+
+@pytest.mark.parametrize(
+    "retention_time,expected",
+    [
+        ("1854,5-1886,5", 1854.5),
+        ("1904,5", 1904.5),
+        (1904.5, 1904.5),
+    ],
+)
+def test10(retention_time, expected):
+    # retention times with decimal comma
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
+
+    assert __get_merox_retention_time(retention_time, ",") == pytest.approx(expected)
+
+
+def test11(tmp_path):
+    # pandas does not apply the decimal comma to a column with retention time ranges
+    import pandas as pd
+    from pyXLMS.parser import read_merox
+
+    data = pd.read_csv(MEROX1, sep=";").head(2)
+    data["Retention time in sec"] = ["1854,5-1886,5", "1904,5"]
+    file = tmp_path / "decimal_comma.csv"
+    data.to_csv(file, sep=";", index=False, decimal=",")
+    pr = read_merox(str(file), crosslinker="DSS", decimal=",")
+    csms = pr["crosslink-spectrum-matches"]
+    assert [csm["retention_time"] for csm in csms] == pytest.approx([1854.5, 1904.5])
