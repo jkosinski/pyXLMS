@@ -14,6 +14,8 @@ SCOUT_CSMS_10 = "data/scout/Cas10_Unfiltered_CSMs.csv"
 SCOUT_CSMS_F_10 = "data/scout/Cas10_Filtered_CSMs.csv"
 SCOUT_XL_10 = "data/scout/Cas10_Residue_Pairs.csv"
 SCOUT_MM = "data/scout/Multi_Mod.csv"
+# excerpt of public PRIDE deposit PXD060825 (rows copied verbatim)
+SCOUT_XL_PXD060825 = "data/scout/PXD060825_ResPairs1FDR_AD169_excerpt.csv"
 
 
 def test1():
@@ -611,3 +613,49 @@ def test15():
         assert isinstance(xl.additional_information["csm_count"], int)
         assert xl.additional_information["csm_count"] >= 1
     assert crosslinks[0].additional_information["csm_count"] == 26
+
+
+def test16():
+    # residue pairs with fewer or more protein positions than proteins
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning,
+        match=r"Could not assign protein crosslink positions to proteins unambiguously for 1 crosslinks",
+    ):
+        pr = read_scout(SCOUT_XL_PXD060825, crosslinker="DSSO")
+    xls = pr["crosslinks"]
+    assert len(xls) == 4
+    # one position per protein
+    assert xls[0]["alpha_proteins_crosslink_positions"] == [482]
+    assert xls[0]["beta_proteins_crosslink_positions"] == [459]
+    # one position shared by all proteins
+    assert xls[1]["alpha_proteins"] == ["sp|P07355|ANXA2", "sp|A6NMY6|ANXA2P2"]
+    assert xls[1]["alpha_proteins_crosslink_positions"] == [119, 119]
+    assert xls[1]["beta_proteins_crosslink_positions"] == [104, 104]
+    # three positions for four proteins: not assignable
+    assert xls[2]["alpha_proteins_crosslink_positions"] == [294, 294]
+    assert xls[2]["beta_proteins"] == [
+        "sp|P60709|ACTB",
+        "sp|P62736|ACTA2",
+        "sp|P63267|ACTG2",
+        "sp|P63261|ACTG1",
+    ]
+    assert xls[2]["beta_proteins_crosslink_positions"] is None
+    # two positions in one protein
+    assert xls[3]["alpha_peptide"] == "ENLEKTR"
+    assert xls[3]["alpha_proteins"] == ["sp|Q6NZI2|CAVIN1", "sp|Q6NZI2|CAVIN1"]
+    assert xls[3]["alpha_proteins_crosslink_positions"] == [254, 265]
+    assert xls[3]["beta_proteins_crosslink_positions"] == [272]
+
+
+def test17():
+    from pyXLMS.parser import read_scout
+
+    pr = read_scout(SCOUT_XL_PXD060825, crosslinker="DSSO", verbose=0)
+    assert len(pr["crosslinks"]) == 4
+
+    with pytest.raises(
+        RuntimeError, match=r"Could not assign protein crosslink positions"
+    ):
+        _ = read_scout(SCOUT_XL_PXD060825, crosslinker="DSSO", verbose=2)
