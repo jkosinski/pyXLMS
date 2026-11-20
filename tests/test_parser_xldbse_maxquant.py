@@ -9,6 +9,8 @@ import pytest
 
 MAXQUANT1 = "data/maxquant/run1/crosslinkMsms.txt"
 MAXQUANT2 = "data/maxquant/run2/crosslinkMsms.txt"
+# excerpt of public PRIDE deposit PXD044723 (rows copied verbatim)
+MAXQUANT3 = "data/maxquant/PXD044723_crosslinkMsms_excerpt.txt"
 
 
 def test1():
@@ -330,3 +332,35 @@ def test4():
 
     csms = pr["crosslink-spectrum-matches"]
     assert len(csms) == 730
+
+
+def test5():
+    # crosslink indices in columns Pro_InterLink1/Pep_InterLink1 (and 2), e.g. "64;"
+    from pyXLMS.parser import read_maxlynx
+    from pyXLMS.transform import modifications_to_str as mts
+
+    pr = read_maxlynx(MAXQUANT3, crosslinker="DSBU")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 2
+
+    csm = csms[0]
+    assert csm["alpha_peptide"] == "QAQAQLEKAK"
+    assert csm["alpha_peptide_crosslink_position"] == 8
+    assert mts(csm["alpha_modifications"]) == "(8:[DSBU|196.08479231])"
+    assert csm["alpha_proteins"] == ["D1D2"]
+    assert csm["alpha_proteins_crosslink_positions"] == [64]
+    assert csm["alpha_proteins_peptide_positions"] == [57]
+    assert csm["beta_peptide"] == "TKPVAFAVR"
+    assert csm["beta_peptide_crosslink_position"] == 2
+    assert csm["beta_proteins_crosslink_positions"] == [68]
+    assert csm["beta_proteins_peptide_positions"] == [67]
+    assert csm["scan_nr"] == 4217
+
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "IKIIAPPER"
+    assert csm["alpha_proteins"] == ["P68135"]
+    assert csm["alpha_proteins_crosslink_positions"] == [330]
+    assert csm["beta_peptide"] == "ISSPKVLQR"
+    assert csm["beta_proteins"] == ["D1D2"]
+    assert csm["beta_proteins_crosslink_positions"] == [357]
+    assert csm["crosslink_type"] == "inter"
