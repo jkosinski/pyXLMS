@@ -15,6 +15,7 @@ CSMS_XLSX = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3_CSMs.xlsx"
 # excerpts of public PRIDE deposits PXD007513 and PXD031033 (rows copied verbatim)
 CSMS_TSV_PXD007513 = "data/xlinkx/PXD007513_NPM1_XL_CSMs_excerpt.txt"
 CSMS_TSV_PXD031033 = "data/xlinkx/PXD031033_CSMs_excerpt.txt"
+CSMS_TSV_PXD014584 = "data/xlinkx/PXD014584_Nuc_S60D10_CSMs_excerpt.txt"
 
 
 def test1():
@@ -1360,3 +1361,24 @@ def test18():
     assert csm["beta_proteins_crosslink_positions"] == [126]
     assert csm["scan_nr"] == 1780
     assert csm["retention_time"] == pytest.approx(10.6638 * 60.0)
+
+
+def test19():
+    # decoys without protein have a placeholder protein position of 1
+    from pyXLMS.parser import read_xlinkx
+
+    pr = read_xlinkx(CSMS_TSV_PXD014584)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    csm = csms[0]
+    assert csm["alpha_proteins"] == ["P12695"]
+    assert csm["alpha_proteins_crosslink_positions"] == [156]
+    assert not csm["alpha_decoy"]
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "ASRPAIKFGLIDNK"
+    assert csm["alpha_peptide_crosslink_position"] == 7
+    assert csm["alpha_proteins"] is None
+    assert csm["alpha_proteins_crosslink_positions"] is None
+    assert csm["alpha_proteins_peptide_positions"] is None
+    assert csm["beta_proteins"] is None
+    assert csm["alpha_decoy"] and csm["beta_decoy"]
