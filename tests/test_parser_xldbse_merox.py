@@ -10,6 +10,9 @@ import pytest
 MEROX1 = "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.csv"
 MEROX2 = "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.zhrm"
 MEROX3 = "data/merox/cas11.csv"
+# excerpts of public PRIDE deposits PXD008348 and PXD015080 (rows copied verbatim)
+MEROX4 = "data/merox/PXD008348_Npl3HMT1_DSSO_R1_excerpt.zhrm"
+MEROX5 = "data/merox/PXD015080_N29_excerpt.zhrm"
 
 
 def test1():
@@ -462,3 +465,94 @@ def test7():
     )
     with pytest.raises(KeyError, match=err_str):
         _ = read_merox(MEROX1, crosslinker="DiSPASO")
+
+
+def test8():
+    # scan number without spectrum file, e.g. "8464"
+    from pyXLMS.parser import read_merox
+
+    pr = read_merox(MEROX4, crosslinker="DSSO")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert [csm["spectrum_file"] for csm in csms] == ["", "", ""]
+    assert [csm["scan_nr"] for csm in csms] == [8464, 9519, 10115]
+    assert [csm["retention_time"] for csm in csms] == pytest.approx(
+        [1875.0, 2081.0, 2192.0]
+    )
+    assert csms[0]["alpha_peptide"] == "DSATEKTK"
+    assert csms[0]["beta_peptide"] == "LTAKR"
+
+
+def test9():
+    # spectrum title with raw file and native id, with and without leading "(-1)"
+    from pyXLMS.parser import read_merox
+
+    pr = read_merox(MEROX5, crosslinker="HSAKp", parse_modifications=False)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 4
+    assert [csm["spectrum_file"] for csm in csms] == [
+        "20190726_stamch_BSA_HSAKp_MODDE_N29"
+    ] * 4
+    assert [csm["scan_nr"] for csm in csms] == [10031, 10529, 10498, 10539]
+    assert [csm["charge"] for csm in csms] == [4, 5, 4, 4]
+
+
+@pytest.mark.parametrize(
+    "scan_nr_and_file,scan_nr,spectrum_file",
+    [
+        (
+            "10061~XLpeplib_Beveridge_QEx-HFX_DSS_R1",
+            10061,
+            "XLpeplib_Beveridge_QEx-HFX_DSS_R1",
+        ),
+        ("7755", 7755, ""),
+        ("9512-9606", 9512, ""),
+        (
+            "10005-10006~f3-1828-MS2MS2-rhogrk-mc4-01",
+            10005,
+            "f3-1828-MS2MS2-rhogrk-mc4-01",
+        ),
+        (
+            "(-1) 10263-10264~f3-1828-MS2MS2-rhogrk-mc4-01",
+            10263,
+            "f3-1828-MS2MS2-rhogrk-mc4-01",
+        ),
+        (
+            '(-1) 20190726_stamch_BSA_HSAKp_MODDE_N29.10031.10031.4 File:"20190726_stamch_BSA_HSAKp_MODDE_N29.raw", '
+            'NativeID:"controllerType=0 controllerNumber=1 scan=10031"',
+            10031,
+            "20190726_stamch_BSA_HSAKp_MODDE_N29",
+        ),
+        (
+            'X-link_trypsin_Craig.3721.3721.2 File:"X-link_trypsin_Craig.raw", '
+            'NativeID:"controllerType=0 controllerNumber=1 scan=3721"',
+            3721,
+            "X-link_trypsin_Craig",
+        ),
+        (
+            "NS=2247,2252,2254-2257~APX-BA5_100DSBU_S1-C1_1_4266.d_unsorted",
+            2247,
+            "APX-BA5_100DSBU_S1-C1_1_4266.d_unsorted",
+        ),
+        (
+            "NS=sn10318~6b705f9e9cdedd27___Xpl1_001268.raw.-1",
+            10318,
+            "6b705f9e9cdedd27___Xpl1_001268.raw.-1",
+        ),
+    ],
+)
+def test10(scan_nr_and_file, scan_nr, spectrum_file):
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_scan_number
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_spectrum_file
+
+    assert __get_merox_scan_number(scan_nr_and_file) == scan_nr
+    assert __get_merox_spectrum_file(scan_nr_and_file) == spectrum_file
+
+
+def test11():
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_scan_number
+
+    with pytest.raises(RuntimeError, match="Could not scan number from"):
+        _ = __get_merox_scan_number('scan File:"run.raw"')
+    with pytest.raises(RuntimeError, match="Could not scan number from"):
+        _ = __get_merox_scan_number('Locus:1.1.1.1409.10 File:"run.wiff"')
