@@ -12,6 +12,9 @@ XL_TSV = "data/ms_annika/XLpeplib_Beveridge_QEx-HFX_DSS_R1_Crosslinks.txt"
 XL_XLSX = "data/ms_annika/XLpeplib_Beveridge_QEx-HFX_DSS_R1_Crosslinks.xlsx"
 CSMS_TSV = "data/ms_annika/XLpeplib_Beveridge_QEx-HFX_DSS_R1_CSMs.txt"
 CSMS_XLSX = "data/ms_annika/XLpeplib_Beveridge_QEx-HFX_DSS_R1_CSMs.xlsx"
+# excerpts of public PRIDE deposit PXD043531 (unfiltered, rows copied verbatim)
+CSMS_TSV_PXD043531 = "data/ms_annika/PXD043531_DSBSO_HEK_MSAnnika_CSMs_excerpt.txt"
+XL_TSV_PXD043531 = "data/ms_annika/PXD043531_DSBSO_HEK_MSAnnika_Crosslinks_excerpt.txt"
 
 
 def test1():
@@ -1315,3 +1318,69 @@ def test16():
     )
     with pytest.raises(KeyError, match=err_str):
         _r = p.read_msannika(CSMS_XLSX, modifications=modifications)
+
+
+def test17():
+    # unfiltered CSMs: decoy peptides without protein accession and protein position
+    from pyXLMS.parser import read_msannika
+
+    pr = read_msannika(CSMS_TSV_PXD043531)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 5
+    assert [csm["scan_nr"] for csm in csms] == [1241, 1243, 1244, 1245, 1246]
+
+    # target-target
+    csm = csms[0]
+    assert csm["alpha_proteins"] == ["Q14980"]
+    assert csm["alpha_proteins_crosslink_positions"] == [708]
+    assert csm["beta_proteins_crosslink_positions"] == [715]
+    assert not csm["alpha_decoy"] and not csm["beta_decoy"]
+
+    # target-decoy
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "GGEAQKKENMEWAELIR"
+    assert csm["alpha_peptide_crosslink_position"] == 7
+    assert csm["alpha_proteins"] is None
+    assert csm["alpha_proteins_crosslink_positions"] is None
+    assert csm["alpha_proteins_peptide_positions"] is None
+    assert csm["alpha_decoy"]
+    assert csm["beta_peptide"] == "KSFLMKR"
+    assert csm["beta_proteins"] == ["Q9ULH0"]
+    assert csm["beta_proteins_crosslink_positions"] == [1448]
+    assert csm["beta_proteins_peptide_positions"] == [1448]
+    assert not csm["beta_decoy"]
+
+    # decoy-decoy
+    csm = csms[2]
+    assert csm["alpha_proteins"] is None
+    assert csm["beta_proteins"] is None
+    assert csm["alpha_decoy"] and csm["beta_decoy"]
+
+
+def test18():
+    # unfiltered crosslinks: decoy peptides without protein have position -1
+    from pyXLMS.parser import read_msannika
+
+    pr = read_msannika(XL_TSV_PXD043531)
+    xls = pr["crosslinks"]
+    assert len(xls) == 4
+
+    xl = xls[1]
+    assert xl["alpha_peptide"] == "GGEAQKKENMEWAELIR"
+    assert xl["alpha_peptide_crosslink_position"] == 7
+    assert xl["alpha_proteins"] is None
+    assert xl["alpha_proteins_crosslink_positions"] is None
+    assert xl["beta_peptide"] == "KSFLMKR"
+    assert xl["beta_peptide_crosslink_position"] == 1
+    assert xl["beta_proteins"] == ["Q9ULH0"]
+    assert xl["beta_proteins_crosslink_positions"] == [1448]
+    # decoy crosslink of a decoy peptide (no protein) and a target peptide, as labelled
+    # in the matching crosslink-spectrum-match (scan 1243: KSFLMKR T, GGEAQKKENMEWAELIR D)
+    assert xl["alpha_decoy"]
+    assert not xl["beta_decoy"]
+
+    xl = xls[2]
+    assert xl["alpha_peptide_crosslink_position"] == 13
+    assert xl["beta_peptide_crosslink_position"] == 5
+    assert xl["alpha_proteins"] is None
+    assert xl["beta_proteins"] is None

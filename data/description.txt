@@ -22,6 +22,8 @@ FILETREE                                                                        
 +---ms_annika                                                                   |               |
 ¦       Nucleus_Rep1_Crosslinks.parquet                                         | Custom        | DSBSO
 ¦       Nucleus_Rep1_CSMs.parquet                                               | Custom        | DSBSO
+¦       PXD043531_DSBSO_HEK_MSAnnika_CSMs_excerpt.txt                           | MS Annika     | DSBSO
+¦       PXD043531_DSBSO_HEK_MSAnnika_Crosslinks_excerpt.txt                     | MS Annika     | DSBSO
 ¦       XLpeplib_Beveridge_QEx-HFX_DSS_R1.mzid                                  | mzIdentML     | DSS
 ¦       XLpeplib_Beveridge_QEx-HFX_DSS_R1.pdResult                              | MS Annika     | DSS
 ¦       XLpeplib_Beveridge_QEx-HFX_DSS_R1_Crosslinks.txt                        | MS Annika     | DSS
