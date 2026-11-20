@@ -473,12 +473,17 @@ def test7():
         # range of merged scans, e.g. in PRIDE deposits PXD008348 and PXD019215
         ("1854-1886", 1854.0),
         ("2241-2241", 2241.0),
+        # empty in exported tables, e.g. in PRIDE deposits PXD012127 and PXD017299
+        (" ", None),
     ],
 )
 def test8(retention_time, expected):
     from pyXLMS.parser._parser_xldbse_merox import __get_merox_retention_time
 
-    assert __get_merox_retention_time(retention_time) == pytest.approx(expected)
+    if expected is None:
+        assert __get_merox_retention_time(retention_time) is None
+    else:
+        assert __get_merox_retention_time(retention_time) == pytest.approx(expected)
 
 
 def test9():

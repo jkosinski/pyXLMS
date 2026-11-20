@@ -348,12 +348,13 @@ def __get_merox_spectrum_file(scan_nr_and_file: str) -> str:
     return spectrum_file
 
 
-def __get_merox_retention_time(retention_time: Any) -> float:
+def __get_merox_retention_time(retention_time: Any) -> Optional[float]:
     r"""Helper function to parse the retention time from MeroX.
 
     Parses the retention time in seconds from MeroX. MeroX reports a range of retention
     times, e.g. ``"1854-1886"``, for merged scans, in that case the start of the range
-    is returned.
+    is returned. Some exported tables leave the retention time empty, e.g. ``" "``, in
+    that case ``None`` is returned.
 
     Parameters
     ----------
@@ -362,8 +363,8 @@ def __get_merox_retention_time(retention_time: Any) -> float:
 
     Returns
     -------
-    float
-        The parsed retention time in seconds.
+    float, or None
+        The parsed retention time in seconds, or None if no retention time is given.
 
     Raises
     ------
@@ -374,6 +375,8 @@ def __get_merox_retention_time(retention_time: Any) -> float:
     -----
     This function should not be called directly, it is called from ``read_merox()``.
     """
+    if str(retention_time).strip() == "":
+        return None
     rt = None
     try:
         rt_range = re.fullmatch(
