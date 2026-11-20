@@ -1374,7 +1374,10 @@ def test18():
     assert xl["beta_peptide_crosslink_position"] == 1
     assert xl["beta_proteins"] == ["Q9ULH0"]
     assert xl["beta_proteins_crosslink_positions"] == [1448]
-    assert xl["alpha_decoy"] and xl["beta_decoy"]
+    # decoy crosslink of a decoy peptide (no protein) and a target peptide, as labelled
+    # in the matching crosslink-spectrum-match (scan 1243: KSFLMKR T, GGEAQKKENMEWAELIR D)
+    assert xl["alpha_decoy"]
+    assert not xl["beta_decoy"]
 
     xl = xls[2]
     assert xl["alpha_peptide_crosslink_position"] == 13

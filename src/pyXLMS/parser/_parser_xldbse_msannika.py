@@ -211,9 +211,11 @@ def read_msannika(
     --------
     MS Annika does not report if the individual peptides in a crosslink are from the target or decoy database.
     The parser assumes that both peptides from a target crosslink are from the target database, and vice versa,
-    that both peptides are from the decoy database if it is a decoy crosslink. This leads to only TT and DD matches,
-    which needs to be considered for FDR estimation. This also only applies to crosslinks and not crosslink-spectrum-matches,
-    where this information is correctly reported and parsed.
+    that both peptides are from the decoy database if it is a decoy crosslink. In unfiltered results decoy peptides
+    have no protein: if only one peptide of a decoy crosslink has no protein, only this peptide is labelled as decoy,
+    and the other one as target. Otherwise this leads to only TT and DD matches, which needs to be considered for FDR
+    estimation. This also only applies to crosslinks and not crosslink-spectrum-matches, where this information is
+    correctly reported and parsed.
 
     Examples
     --------
@@ -419,6 +421,15 @@ def read_msannika(
                                 f"Encountered invalid crosslink position for crosslink with sequence "
                                 f"{format_sequence(str(row['Sequence A']))}-{format_sequence(str(row['Sequence B']))}!"
                             )
+                    # decoy peptides of unfiltered results have no protein, the other peptide of a
+                    # decoy crosslink with a protein is a target peptide
+                    decoy = get_bool_from_value(row["Decoy"])
+                    decoy_a = decoy and (
+                        pd.isna(row["Accession A"]) or not pd.isna(row["Accession B"])
+                    )
+                    decoy_b = decoy and (
+                        pd.isna(row["Accession B"]) or not pd.isna(row["Accession A"])
+                    )
                     # create crosslink
                     crosslink = create_crosslink(
                         peptide_a=format_sequence(str(row["Sequence A"])),
@@ -434,7 +445,7 @@ def read_msannika(
                         if not pd.isna(row["Accession A"])
                         else None,
                         xl_position_proteins_a=xl_position_proteins_a,
-                        decoy_a=get_bool_from_value(row["Decoy"]),
+                        decoy_a=decoy_a,
                         peptide_b=format_sequence(str(row["Sequence B"])),
                         # decoy peptides without protein have position -1, the crosslinked
                         # residue is marked in the sequence, e.g. "GGEAQK[K]ENMEWAELIR"
@@ -448,7 +459,7 @@ def read_msannika(
                         if not pd.isna(row["Accession B"])
                         else None,
                         xl_position_proteins_b=xl_position_proteins_b,
-                        decoy_b=get_bool_from_value(row["Decoy"]),
+                        decoy_b=decoy_b,
                         score=__parse_float(row["Best CSM Score"]),
                         additional_information={
                             "source": __serialize_pandas_series(row)
