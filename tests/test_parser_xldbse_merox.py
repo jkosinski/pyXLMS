@@ -529,6 +529,16 @@ def test9():
             3721,
             "X-link_trypsin_Craig",
         ),
+        (
+            "NS=2247,2252,2254-2257~APX-BA5_100DSBU_S1-C1_1_4266.d_unsorted",
+            2247,
+            "APX-BA5_100DSBU_S1-C1_1_4266.d_unsorted",
+        ),
+        (
+            "NS=sn10318~6b705f9e9cdedd27___Xpl1_001268.raw.-1",
+            10318,
+            "6b705f9e9cdedd27___Xpl1_001268.raw.-1",
+        ),
     ],
 )
 def test10(scan_nr_and_file, scan_nr, spectrum_file):
@@ -544,3 +554,5 @@ def test11():
 
     with pytest.raises(RuntimeError, match="Could not scan number from"):
         _ = __get_merox_scan_number('scan File:"run.raw"')
+    with pytest.raises(RuntimeError, match="Could not scan number from"):
+        _ = __get_merox_scan_number('Locus:1.1.1.1409.10 File:"run.wiff"')
