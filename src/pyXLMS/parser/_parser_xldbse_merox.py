@@ -122,8 +122,8 @@ def __get_merox_sequence(
 ) -> str:
     r"""Helper funtion to read the MeroX peptide sequence.
 
-    Reads the MeroX peptide sequence and removes prefix and suffix square brackets,
-    then replaces modification symbols with their respective amino acids. If
+    Reads the MeroX peptide sequence and removes prefix and suffix square brackets
+    (or curly brackets for protein-terminal peptides), then replaces modification symbols with their respective amino acids. If
     ``parse_modifications = True`` non-resolved symbols will raise an error,
     otherwise the symbol will be used in the sequence - even if it is not a valid
     amino acid sequence anymore.
@@ -154,7 +154,7 @@ def __get_merox_sequence(
     This function should not be called directly, it is called from ``read_merox()``.
     """
     parsed_seq = ""
-    for amino_acid in sequence.lstrip("[").rstrip("]").strip():
+    for amino_acid in sequence.lstrip("[{").rstrip("]}").strip():
         if amino_acid in modifications:
             parsed_seq += modifications[amino_acid]["Amino Acid"]
         elif amino_acid in AMINO_ACIDS:
@@ -211,7 +211,7 @@ def __get_merox_modifications(
     This function should not be called directly, it is called from ``read_merox()``.
     """
     parsed_modifications = {crosslink_position: (crosslinker, crosslinker_mass)}
-    for i, amino_acid in enumerate(sequence.lstrip("[").rstrip("]").strip()):
+    for i, amino_acid in enumerate(sequence.lstrip("[{").rstrip("]}").strip()):
         if amino_acid in modifications:
             if i + 1 not in parsed_modifications:
                 parsed_modifications[i + 1] = modifications[amino_acid]["Modification"]
@@ -253,6 +253,73 @@ def __get_merox_position(position_str: str) -> int:
         position = __parse_int(position_str[1:])
     except Exception as e:
         raise RuntimeError(f"Could not parse position from {position_str}!") from e
+    return position
+
+
+def __get_merox_crosslink_position(position_str: str) -> int:
+    r"""Helper function to extract the peptide crosslink position from MeroX.
+
+    MeroX reports crosslinks to the protein N-terminus at position 0, e.g. ``"{0"``.
+    These are assigned to the first residue of the peptide (position 1). All other
+    positions are returned as parsed by ``__get_merox_position()``.
+
+    Parameters
+    ----------
+    position_str : str
+        The position string from MeroX e.g. from column "best linkage position peptide 1".
+
+    Returns
+    -------
+    int
+        The parsed peptide crosslink position (1-based).
+
+    Raises
+    ------
+    RuntimeError
+        If the position could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    position = __get_merox_position(position_str)
+    if position == 0 and position_str.strip().startswith("{"):
+        return 1
+    return position
+
+
+def __get_merox_peptide_position(from_position: Any, sequence: str) -> int:
+    r"""Helper function to extract the peptide position in the protein from MeroX.
+
+    MeroX reports the start of protein N-terminal peptides (sequences starting with
+    ``"{"``) one position lower than the start of all other peptides, e.g. ``0`` for a
+    peptide starting at the first residue of the protein. This function returns the
+    1-based position for all peptides.
+
+    Parameters
+    ----------
+    from_position : any
+        The peptide start from MeroX e.g. from column "From".
+    sequence : str
+        The MeroX sequence e.g. from column "Peptide 1" or "Peptide2".
+
+    Returns
+    -------
+    int
+        The peptide position in the protein (1-based).
+
+    Raises
+    ------
+    ValueError
+        If the position could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    position = __parse_int(from_position)
+    if str(sequence).strip().startswith("{"):
+        return position + 1
     return position
 
 
@@ -594,16 +661,20 @@ def read_merox(
                 )
                 if parse_modifications
                 else None,
-                xl_position_peptide_a=__get_merox_position(
+                xl_position_peptide_a=__get_merox_crosslink_position(
                     str(row["best linkage position peptide 1"])
                 ),
                 proteins_a=__get_merox_protein(str(row["Protein 1"])),
                 xl_position_proteins_a=[
-                    __parse_int(row["From"])
-                    + __get_merox_position(str(row["best linkage position peptide 1"]))
+                    __get_merox_peptide_position(row["From"], str(row["Peptide 1"]))
+                    + __get_merox_crosslink_position(
+                        str(row["best linkage position peptide 1"])
+                    )
                     - 1
                 ],
-                pep_position_proteins_a=[__parse_int(row["From"])],
+                pep_position_proteins_a=[
+                    __get_merox_peptide_position(row["From"], str(row["Peptide 1"]))
+                ],
                 score_a=__parse_float(row["pepScore1"]),
                 decoy_a=__get_merox_protein(str(row["Protein 1"]))[0].startswith(
                     decoy_prefix
@@ -620,16 +691,20 @@ def read_merox(
                 )
                 if parse_modifications
                 else None,
-                xl_position_peptide_b=__get_merox_position(
+                xl_position_peptide_b=__get_merox_crosslink_position(
                     str(row["best linkage position peptide 2"])
                 ),
                 proteins_b=__get_merox_protein(str(row["Protein 2"])),
                 xl_position_proteins_b=[
-                    __parse_int(row["From.1"])
-                    + __get_merox_position(str(row["best linkage position peptide 2"]))
+                    __get_merox_peptide_position(row["From.1"], str(row["Peptide2"]))
+                    + __get_merox_crosslink_position(
+                        str(row["best linkage position peptide 2"])
+                    )
                     - 1
                 ],
-                pep_position_proteins_b=[__parse_int(row["From.1"])],
+                pep_position_proteins_b=[
+                    __get_merox_peptide_position(row["From.1"], str(row["Peptide2"]))
+                ],
                 score_b=__parse_float(row["pepScore2"]),
                 decoy_b=__get_merox_protein(str(row["Protein 2"]))[0].startswith(
                     decoy_prefix
