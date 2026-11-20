@@ -63,6 +63,7 @@ FILETREE                                                                        
 ¦   ¦   Cas9_Unfiltered_CSMs.csv                                                | Scout         | DSSO
 ¦   ¦   Multi_Mod.csv                                                           | Scout         | DSSO
 ¦   ¦   PXD060825_ResPairs1FDR_AD169_excerpt.csv                                | Scout         | unknown
+¦   ¦   PXD043531_DSBSO_HEK_Scout_CSMs_excerpt.csv                              | Scout         | DSBSO
 ¦   ¦                                                                           |               |
 ¦   +---Cas9_HeLa_Cyt_r1                                                        |               |
 ¦   ¦       Cas9_HeLa_Cyt_r1.scout                                              | NOT SUPPORTED |

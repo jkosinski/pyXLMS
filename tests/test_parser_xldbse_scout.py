@@ -16,6 +16,8 @@ SCOUT_XL_10 = "data/scout/Cas10_Residue_Pairs.csv"
 SCOUT_MM = "data/scout/Multi_Mod.csv"
 # excerpt of public PRIDE deposit PXD060825 (rows copied verbatim)
 SCOUT_XL_PXD060825 = "data/scout/PXD060825_ResPairs1FDR_AD169_excerpt.csv"
+# excerpt of public PRIDE deposit PXD043531 (rows copied verbatim)
+SCOUT_CSMS_F_PXD043531 = "data/scout/PXD043531_DSBSO_HEK_Scout_CSMs_excerpt.csv"
 
 
 def test1():
@@ -659,3 +661,48 @@ def test17():
         RuntimeError, match=r"Could not assign protein crosslink positions"
     ):
         _ = read_scout(SCOUT_XL_PXD060825, crosslinker="DSSO", verbose=2)
+
+
+def test18():
+    # filtered CSMs with looplinks written as beta peptide "---" and position -1
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning, match=r"Skipped 2 looplink rows, only crosslinks are read!"
+    ):
+        pr = read_scout(SCOUT_CSMS_F_PXD043531, crosslinker="DSBSO")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 2
+    assert [csm["scan_nr"] for csm in csms] == [1241, 17022]
+
+
+def test19():
+    # filtered CSMs with looplinks without beta peptide
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning, match=r"Skipped 4 looplink rows, only crosslinks are read!"
+    ):
+        pr = read_scout(SCOUT_CSMS_F_9, crosslinker="DSSO")
+    assert len(pr["crosslink-spectrum-matches"]) == 1306
+
+
+def test20():
+    # unfiltered CSMs with looplinks
+    from pyXLMS.parser import read_scout
+
+    with pytest.warns(
+        RuntimeWarning, match=r"Skipped 45673 looplink rows, only crosslinks are read!"
+    ):
+        pr = read_scout(
+            "data/scout2/Cas9_HeLa_Cyt_r1/Cas9_HeLa_Cyt_r1_unfiltered_CSMs.csv",
+            crosslinker="DSBSO",
+        )
+    assert len(pr["crosslink-spectrum-matches"]) == 500
+
+
+def test21():
+    from pyXLMS.parser import read_scout
+
+    pr = read_scout(SCOUT_CSMS_F_PXD043531, crosslinker="DSBSO", verbose=0)
+    assert len(pr["crosslink-spectrum-matches"]) == 2
