@@ -175,3 +175,34 @@ def test9():
     assert len(csms) > 0
     for csm in csms:
         assert csm.additional_information["pass_threshold"] is True
+
+
+@pytest.mark.slow
+def test10(tmp_path):
+    # pyteomics cannot read a peptide with an empty cvParam (as written for a second
+    # crosslinker definition, e.g. in PRIDE deposits PXD066061 and PXD066071), the
+    # spectrum is skipped and counted in a warning
+    import warnings
+    from pyXLMS import parser as p
+
+    with open(F1, "r", encoding="utf-8") as f:
+        content = f.read()
+    # crosslinker modification of peptide "XL_-132_1_DON" (GQKNSR)
+    param = '<cvParam accession="MS:1002509" cvRef="PSI-MS" name="cross-link donor" value="17" />'
+    assert content.count(param) == 1
+    content = content.replace(param, "<cvParam></cvParam>" + param)
+    f_unresolved = tmp_path / "unresolved.mzid"
+    f_unresolved.write_text(content, encoding="utf-8")
+
+    with warnings.catch_warnings(record=True) as wl:
+        warnings.simplefilter("always")
+        pr = p.read_mzid(str(f_unresolved))
+    skipped = [str(w.message) for w in wl if str(w.message).startswith("Skipped")]
+    assert skipped == [
+        "Skipped 1 spectra with crosslink identifications whose peptides could not be "
+        "read from the mzIdentML file (unresolved references)!"
+    ]
+    assert len(pr["crosslink-spectrum-matches"]) == 785
+
+    pr = p.read_mzid(str(f_unresolved), verbose=0)
+    assert len(pr["crosslink-spectrum-matches"]) == 785
