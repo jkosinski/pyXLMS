@@ -122,6 +122,15 @@ def __read_msannika_pdresult(filename: str, drop: bool = False) -> List[pd.DataF
     }
     csms = csms.rename(columns=column_mapping_csms)
     xls = xls.rename(columns=column_mapping_xls)
+    # decoy peptides without protein have empty accessions and positions, mark them as missing
+    # values as in the MS Annika result tables
+    for data, columns in [
+        (csms, ["Accession A", "Accession B", "A in protein", "B in protein"]),
+        (xls, ["Accession A", "Accession B", "In protein A", "In protein B"]),
+    ]:
+        for column in columns:
+            if column in data.columns:
+                data[column] = data[column].replace("", None)
     if drop:
         csms = csms.drop(
             columns=list(
@@ -624,7 +633,9 @@ def read_msannika(
                         scan_nr=__parse_int(row["First Scan"]),
                         charge=__parse_int(row["Charge"]),
                         rt=__parse_float(row["RT [min]"]) * 60.0,
-                        im_cv=__parse_float(row["Compensation Voltage"]),
+                        im_cv=__parse_float(row["Compensation Voltage"])
+                        if "Compensation Voltage" in col_names
+                        else None,
                         additional_information={
                             "source": __serialize_pandas_series(row)
                         },
