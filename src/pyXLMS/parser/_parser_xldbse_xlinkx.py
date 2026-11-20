@@ -127,6 +127,45 @@ def __read_xlinkx_pdresult(filename: str, drop: bool = False) -> List[pd.DataFra
     return [csms, target_xls]
 
 
+def __rename_older_xlinkx_columns(data: pd.DataFrame) -> pd.DataFrame:
+    r"""Rename columns of older XlinkX crosslink-spectrum-match tables.
+
+    Older versions of XlinkX and Proteome Discoverer use other names for some columns,
+    e.g. "RT in min" instead of "RT [min]", or "Gene Name A" for the protein accession.
+    These are renamed to the current names if the current name is not present.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The XlinkX result table.
+
+    Returns
+    -------
+    pd.DataFrame
+        The XlinkX result table with renamed columns.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_xlinkx()``.
+    """
+    column_mapping = {
+        "RT in min": "RT [min]",
+        "First scan": "First Scan",
+        "Gene Name A": "Protein Accession A",
+        "Gene name A": "Protein Accession A",
+        "Gene Name B": "Protein Accession B",
+        "Gene name B": "Protein Accession B",
+        "Spectrum file path": "Spectrum File",
+    }
+    columns = data.columns.tolist()
+    rename = {
+        old: new
+        for old, new in column_mapping.items()
+        if old in columns and new not in columns
+    }
+    return data.rename(columns=rename)
+
+
 def read_xlinkx(
     files: str | List[str] | BinaryIO,
     decoy: Optional[bool] = None,
@@ -401,6 +440,7 @@ def read_xlinkx(
                 raise RuntimeError(
                     "Something went wrong while reading the file! Please file a bug report!"
                 )
+            data = __rename_older_xlinkx_columns(data)
             ## detect input file type
             col_names = data.columns.tolist()
             is_crosslink_dataframe = "Max. XlinkX Score" in col_names
@@ -466,7 +506,7 @@ def read_xlinkx(
                             format_sequence(str(row["Sequence A"]).strip()),
                             str(row["Modifications A"]).strip(),
                         )
-                        if parse_modifications
+                        if parse_modifications and "Modifications A" in col_names
                         else None,
                         xl_position_peptide_a=adjust_crosslink_position(
                             __parse_int(row["Crosslinker Position A"]),
@@ -502,7 +542,7 @@ def read_xlinkx(
                             format_sequence(str(row["Sequence B"]).strip()),
                             str(row["Modifications B"]).strip(),
                         )
-                        if parse_modifications
+                        if parse_modifications and "Modifications B" in col_names
                         else None,
                         xl_position_peptide_b=adjust_crosslink_position(
                             __parse_int(row["Crosslinker Position B"]),
