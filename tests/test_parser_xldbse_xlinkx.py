@@ -12,6 +12,9 @@ XL_TSV = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3_Crosslinks.txt"
 XL_XLSX = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3_Crosslinks.xlsx"
 CSMS_TSV = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3_CSMs.txt"
 CSMS_XLSX = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3_CSMs.xlsx"
+# excerpts of public PRIDE deposits PXD007513 and PXD031033 (rows copied verbatim)
+CSMS_TSV_PXD007513 = "data/xlinkx/PXD007513_NPM1_XL_CSMs_excerpt.txt"
+CSMS_TSV_PXD031033 = "data/xlinkx/PXD031033_CSMs_excerpt.txt"
 
 
 def test1():
@@ -1315,3 +1318,45 @@ def test16():
     )
     with pytest.raises(KeyError, match=err_str):
         _r = p.read_xlinkx(CSMS_XLSX, modifications=modifications)
+
+
+def test17():
+    # older layout: accessions in "Gene name A/B", no modification columns,
+    # spectrum file in "Spectrum file path"
+    from pyXLMS.parser import read_xlinkx
+
+    pr = read_xlinkx(CSMS_TSV_PXD007513)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    csm = csms[2]
+    assert csm["alpha_peptide"] == "LLSISGKR"
+    assert csm["alpha_peptide_crosslink_position"] == 7
+    assert csm["alpha_proteins"] == ["P06748"]
+    assert csm["alpha_proteins_crosslink_positions"] == [140]
+    assert csm["alpha_modifications"] is None
+    assert csm["beta_proteins_crosslink_positions"] == [149]
+    assert csm["beta_modifications"] is None
+    assert (
+        csm["spectrum_file"]
+        == "D:\\Domenico\\170624_NPM1xl\\20170410_F1_Ag6_fasci001_NPM1_XL.raw"
+    )
+    assert csm["scan_nr"] == 12054
+    assert csm["retention_time"] == pytest.approx(51.7836 * 60.0)
+    assert csm["score"] == pytest.approx(52.05)
+
+
+def test18():
+    # older layout: retention time in "RT in min"
+    from pyXLMS.parser import read_xlinkx
+
+    pr = read_xlinkx(CSMS_TSV_PXD031033)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    csm = csms[0]
+    assert csm["alpha_peptide"] == "TGIKEK"
+    assert csm["alpha_proteins"] == ["ScOrc2"]
+    assert csm["alpha_proteins_crosslink_positions"] == [135]
+    assert csm["alpha_modifications"] == {4: ("DSSO", 158.00376)}
+    assert csm["beta_proteins_crosslink_positions"] == [126]
+    assert csm["scan_nr"] == 1780
+    assert csm["retention_time"] == pytest.approx(10.6638 * 60.0)
