@@ -1292,7 +1292,7 @@ def test14():
     unsupp_file = XL_XLSX + file_extension
     with pytest.raises(
         ValueError,
-        match="Detected file extension .gz is not supported! Input file has to be a valid file with extension '.csv', '.tsv', '.xlsx', or '.pdResult'!",
+        match="Detected file extension .gz is not supported! Input file has to be a valid file with extension '.csv', '.tsv', '.xlsx', '.pdResult', or '.msf'!",
     ):
         _r = p.read_msannika(unsupp_file)
 

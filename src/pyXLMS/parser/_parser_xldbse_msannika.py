@@ -159,7 +159,7 @@ def read_msannika(
     r"""Read an MS Annika result file.
 
     Reads an MS Annika crosslink-spectrum-matches result file or crosslink result file in ``.csv`` or ``.xlsx`` format,
-    or both from a ``.pdResult`` file from Proteome Discover, and returns a ``parser_result``.
+    or both from a ``.pdResult`` or ``.msf`` file from Proteome Discover, and returns a ``parser_result``.
 
     Parameters
     ----------
@@ -172,6 +172,7 @@ def read_msannika(
         Mapping of modification names to modification masses.
     format : "auto", "csv", "tsv", "txt", "xlsx", or "pdresult", default = "auto"
         The format of the result file. ``"auto"`` is only available if the name/path to the MS Annika result file is given.
+        ``"pdresult"`` reads both ``.pdResult`` and ``.msf`` files.
     sep : str, default = "\t"
         Seperator used in the ``.csv`` or ``.tsv`` file. Parameter is ignored if the file is in ``.xlsx`` or ``.pdResult`` format.
     decimal : str, default = "."
@@ -323,11 +324,11 @@ def read_msannika(
                 ]
             elif file_extension == ".xlsx":
                 data_objects = [pd.read_excel(input, engine="openpyxl", **kwargs)]
-            elif file_extension == ".pdresult":
+            elif file_extension == ".pdresult" or file_extension == ".msf":
                 data_objects = __read_msannika_pdresult(input)
             else:
                 raise ValueError(
-                    f"Detected file extension {file_extension} is not supported! Input file has to be a valid file with extension '.csv', '.tsv', '.xlsx', or '.pdResult'!"
+                    f"Detected file extension {file_extension} is not supported! Input file has to be a valid file with extension '.csv', '.tsv', '.xlsx', '.pdResult', or '.msf'!"
                 )
         elif format in ["csv", "tsv", "txt", "xlsx"]:
             if format == "xlsx":
