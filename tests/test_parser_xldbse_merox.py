@@ -489,3 +489,42 @@ def test_merox_decoy_proteins():
     assert decoy["beta_proteins"] == ["DEC_Cas9"]
     assert decoy["beta_decoy"]
     assert decoy["beta_proteins_crosslink_positions"] == [532]
+
+
+def test_merox_decoy_without_position():
+    import io
+    from pyXLMS.parser import read_merox
+
+    # a decoy peptide MeroX could not place in its decoy protein is written with start 0
+    with open(MEROX1, "r", encoding="utf-8") as f:
+        header, row = f.readline(), f.readline()
+    placed = row.replace(";>Cas9;531;539;", ";DEC_>Cas9;531;539;", 1)
+    unplaced = row.replace(";>Cas9;531;539;", ";DEC_>Cas9;0;0;", 1)
+    target_at_zero = row.replace(";>Cas9;531;539;", ";>Cas9;0;0;", 1)
+    assert len({row, placed, unplaced, target_at_zero}) == 4
+    with pytest.warns(RuntimeWarning, match="Read 1 decoy peptide"):
+        pr = read_merox(
+            io.StringIO(header + placed + unplaced),
+            crosslinker="DSS",
+            parse_modifications=False,
+            modifications={},
+        )
+    placed_csm, unplaced_csm = pr["crosslink-spectrum-matches"]
+    assert placed_csm["beta_proteins_crosslink_positions"] == [532]
+    assert placed_csm["beta_proteins_peptide_positions"] == [531]
+    assert unplaced_csm["beta_peptide"] == "VKYVTEGmR"
+    assert unplaced_csm["beta_peptide_crosslink_position"] == 2
+    assert unplaced_csm["beta_proteins"] == ["DEC_Cas9"]
+    assert unplaced_csm["beta_decoy"]
+    assert unplaced_csm["beta_proteins_crosslink_positions"] is None
+    assert unplaced_csm["beta_proteins_peptide_positions"] is None
+    assert unplaced_csm["alpha_proteins_crosslink_positions"] == [870]
+    assert not unplaced_csm["alpha_decoy"]
+    # a target peptide at start 0 is still an error: only decoys go unplaced
+    with pytest.raises(ValueError, match="0-based"):
+        read_merox(
+            io.StringIO(header + target_at_zero),
+            crosslinker="DSS",
+            parse_modifications=False,
+            modifications={},
+        )

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+import warnings
 import zipfile
 import pandas as pd
 from tqdm import tqdm
@@ -312,6 +313,43 @@ def __is_merox_decoy(protein: str, decoy_prefix: str) -> bool:
     return protein.startswith(decoy_prefix) or protein.startswith(MEROX_DECOY_PREFIX)
 
 
+def __is_merox_unplaced_decoy(
+    proteins: str, from_position: Any, sequence: str, decoy_prefix: str
+) -> bool:
+    r"""Helper function to determine if a MeroX decoy peptide has no protein position.
+
+    MeroX writes peptide start ``0`` (column "From") for a decoy peptide it could not
+    place in its decoy protein, e.g. a short peptide like ``[VKR]``. Its protein
+    positions are then unknown. A peptide starting with ``"{"`` is a protein N-terminal
+    peptide, which MeroX also starts at ``0``.
+
+    Parameters
+    ----------
+    proteins : str
+        The protein string from MeroX e.g. from column "Protein 1".
+    from_position : any
+        The peptide start from MeroX e.g. from column "From".
+    sequence : str
+        The MeroX sequence e.g. from column "Peptide 1".
+    decoy_prefix : str
+        The prefix that indicates that a protein is from the decoy database.
+
+    Returns
+    -------
+    bool
+        If the peptide is a decoy without a protein position.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    return (
+        __is_merox_decoy(__get_merox_protein(proteins)[0], decoy_prefix)
+        and __parse_int(from_position) == 0
+        and not str(sequence).strip().startswith("{")
+    )
+
+
 def __get_merox_scan_number(scan_nr_and_file: str) -> int:
     r"""Helper function to parse the scan number from MeroX.
 
@@ -486,6 +524,7 @@ def read_merox(
 
     ## data structures
     csms = list()
+    unplaced_decoys = 0
 
     ## handle input
     if not isinstance(files, list):
@@ -501,6 +540,14 @@ def read_merox(
             total=data.shape[0],
             desc="Reading MeroX CSMs...",
         ):
+            # decoy peptides that MeroX could not place in their decoy protein
+            unplaced_a = __is_merox_unplaced_decoy(
+                str(row["Protein 1"]), row["From"], str(row["Peptide 1"]), decoy_prefix
+            )
+            unplaced_b = __is_merox_unplaced_decoy(
+                str(row["Protein 2"]), row["From.1"], str(row["Peptide2"]), decoy_prefix
+            )
+            unplaced_decoys += int(unplaced_a) + int(unplaced_b)
             # create crosslink
             csm = create_csm(
                 peptide_a=__get_merox_sequence(
@@ -519,12 +566,16 @@ def read_merox(
                     str(row["best linkage position peptide 1"])
                 ),
                 proteins_a=__get_merox_protein(str(row["Protein 1"])),
-                xl_position_proteins_a=[
+                xl_position_proteins_a=None
+                if unplaced_a
+                else [
                     __parse_int(row["From"])
                     + __get_merox_position(str(row["best linkage position peptide 1"]))
                     - 1
                 ],
-                pep_position_proteins_a=[__parse_int(row["From"])],
+                pep_position_proteins_a=None
+                if unplaced_a
+                else [__parse_int(row["From"])],
                 score_a=__parse_float(row["pepScore1"]),
                 decoy_a=__is_merox_decoy(
                     __get_merox_protein(str(row["Protein 1"]))[0], decoy_prefix
@@ -545,12 +596,16 @@ def read_merox(
                     str(row["best linkage position peptide 2"])
                 ),
                 proteins_b=__get_merox_protein(str(row["Protein 2"])),
-                xl_position_proteins_b=[
+                xl_position_proteins_b=None
+                if unplaced_b
+                else [
                     __parse_int(row["From.1"])
                     + __get_merox_position(str(row["best linkage position peptide 2"]))
                     - 1
                 ],
-                pep_position_proteins_b=[__parse_int(row["From.1"])],
+                pep_position_proteins_b=None
+                if unplaced_b
+                else [__parse_int(row["From.1"])],
                 score_b=__parse_float(row["pepScore2"]),
                 decoy_b=__is_merox_decoy(
                     __get_merox_protein(str(row["Protein 2"]))[0], decoy_prefix
@@ -570,6 +625,15 @@ def read_merox(
                 },
             )
             csms.append(csm)
+    ## report decoys without a position
+    if unplaced_decoys > 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Read {unplaced_decoys} decoy peptide(s) that MeroX did not place in "
+                "their decoy protein (start 0) without protein positions!"
+            ),
+            stacklevel=2,
+        )
     ## check results
     if len(csms) == 0:
         raise RuntimeError(
