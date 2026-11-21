@@ -9,6 +9,8 @@ import pytest
 
 
 PD = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3.pdResult"
+# excerpt of public PRIDE deposit PXD019215 (Proteome Discoverer 2.3, rows copied verbatim)
+PD_PXD019215 = "data/xlinkx/PXD019215_f3_excerpt.pdResult"
 DECOY = False
 
 
@@ -255,3 +257,54 @@ def test5():
     assert parser_result["search_engine"] == "XlinkX"
     assert parser_result["crosslink-spectrum-matches"] is not None
     assert parser_result["crosslinks"] is not None
+
+
+def test6():
+    # pdResult without DecoyCSMs table: decoy CSMs without protein in the CSMs table,
+    # no decoy column in the crosslinks table
+    from pyXLMS import parser as p
+
+    parser_result = p.read_xlinkx(PD_PXD019215, parse_modifications=False)
+    assert parser_result["search_engine"] == "XlinkX"
+
+    csms = parser_result["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "ASTTVSKTE"
+    assert csm["alpha_peptide_crosslink_position"] == 7
+    assert csm["alpha_proteins"] == ["P02699"]
+    assert csm["alpha_proteins_crosslink_positions"] == [339]
+    assert not csm["alpha_decoy"]
+    assert csm["beta_peptide"] == "GEKVENKE"
+    assert csm["beta_peptide_crosslink_position"] == 3
+    assert csm["beta_proteins"] == ["F28327"]
+    assert csm["beta_proteins_crosslink_positions"] == [395]
+    assert not csm["beta_decoy"]
+    assert csm["crosslink_type"] == "inter"
+    assert csm["score"] == pytest.approx(52.2736127100704)
+    assert csm["scan_nr"] == 6059
+    csm = csms[2]
+    assert csm["alpha_peptide"] == "KGGE"
+    assert csm["alpha_peptide_crosslink_position"] == 1
+    assert csm["alpha_proteins"] is None
+    assert csm["alpha_proteins_crosslink_positions"] is None
+    assert csm["alpha_decoy"]
+    assert csm["beta_peptide"] == "LVRQKLE"
+    assert csm["beta_peptide_crosslink_position"] == 5
+    assert csm["beta_proteins"] is None
+    assert csm["beta_decoy"]
+    assert csm["scan_nr"] == 7501
+
+    crosslinks = parser_result["crosslinks"]
+    assert len(crosslinks) == 2
+    assert not any(xl["alpha_decoy"] or xl["beta_decoy"] for xl in crosslinks)
+    xl = crosslinks[1]
+    assert xl["alpha_peptide"] == "ARGEKVENKE"
+    assert xl["alpha_peptide_crosslink_position"] == 5
+    assert xl["alpha_proteins"] == ["F28327"]
+    assert xl["alpha_proteins_crosslink_positions"] == [395]
+    assert xl["beta_peptide"] == "ASTTVSKTE"
+    assert xl["beta_proteins"] == ["P02699"]
+    assert xl["beta_proteins_crosslink_positions"] == [339]
+    assert xl["crosslink_type"] == "inter"
+    assert xl["score"] == pytest.approx(62.841949164762)

@@ -116,6 +116,7 @@ FILETREE                                                                        
 ¦       PXD014584_Nuc_S60D10_CSMs_excerpt.txt                                   | XlinkX        | DSSO
 ¦       PXD007513_NPM1_XL_CSMs_excerpt.txt                                      | XlinkX        | DSSO
 ¦       PXD031033_CSMs_excerpt.txt                                              | XlinkX        | DSSO
+¦       PXD019215_f3_excerpt.pdResult                                           | XlinkX        | MC4
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.mzid                                  | mzIdentML     | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.pdResult                              | XlinkX        | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3_Crosslinks.txt                        | XlinkX        | DSSO

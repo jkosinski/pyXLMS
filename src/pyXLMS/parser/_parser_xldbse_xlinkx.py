@@ -61,8 +61,17 @@ def __read_xlinkx_pdresult(filename: str, drop: bool = False) -> List[pd.DataFra
     This function should not be called directly, it is called from ``read_xlinkx()``.
     """
     conn = sqlite3.connect(filename)
+    tables = [
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    ]
     csms = pd.read_sql_query("SELECT * FROM CSMs", conn)
-    dcsms = pd.read_sql_query("SELECT * FROM DecoyCSMs", conn)
+    # Proteome Discoverer 2.3 has no DecoyCSMs table, decoy CSMs are in the CSMs table
+    dcsms = (
+        pd.read_sql_query("SELECT * FROM DecoyCSMs", conn)
+        if "DecoyCSMs" in tables
+        else pd.DataFrame()
+    )
     xls = pd.read_sql_query("SELECT * FROM Crosslinks", conn)
     conn.close()
     column_mapping_csms = {
@@ -99,10 +108,18 @@ def __read_xlinkx_pdresult(filename: str, drop: bool = False) -> List[pd.DataFra
     csms = csms.rename(columns=column_mapping_csms)
     if "Is Decoy" not in csms.columns:
         csms["Is Decoy"] = [False for i in range(csms.shape[0])]
+    # decoy peptides without protein have empty accessions, mark them as missing values as in
+    # the XlinkX result tables
+    for column in ["Protein Accession A", "Protein Accession B"]:
+        if column in csms.columns:
+            csms[column] = csms[column].replace("", None)
     dcsms = dcsms.rename(columns=column_mapping_csms)
     if "Is Decoy" not in dcsms.columns:
         dcsms["Is Decoy"] = [True for i in range(dcsms.shape[0])]
     xls = xls.rename(columns=column_mapping_xls)
+    # crosslinks of Proteome Discoverer 2.3 have no decoy column, they are all targets
+    if "Is Decoy" not in xls.columns:
+        xls["Is Decoy"] = [False for i in range(xls.shape[0])]
     if drop:
         csms = csms.drop(
             columns=list(
