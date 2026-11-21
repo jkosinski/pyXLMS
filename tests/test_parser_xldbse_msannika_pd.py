@@ -11,6 +11,8 @@ import pytest
 PD = "data/ms_annika/XLpeplib_Beveridge_QEx-HFX_DSS_R1.pdResult"
 # excerpt of public PRIDE deposit PXD056680 (Proteome Discoverer 2.4, rows copied verbatim)
 PD_PXD056680 = "data/ms_annika/PXD056680_F008604_excerpt.pdResult"
+# the same rows of the .msf file of the same search
+PD_PXD056680_MSF = "data/ms_annika/PXD056680_F008604_excerpt.msf"
 
 
 def test1():
@@ -106,3 +108,35 @@ def test2():
     assert xl["beta_proteins_crosslink_positions"] == [894]
     assert xl["alpha_decoy"]
     assert not xl["beta_decoy"]
+
+
+def test3():
+    # .msf file with the same tables as the .pdResult file
+    from pyXLMS.parser import read_msannika
+
+    pr = read_msannika(PD_PXD056680_MSF)
+    assert pr["search_engine"] == "MS Annika"
+    pr_pdresult = read_msannika(PD_PXD056680)
+    for key in ["crosslink-spectrum-matches", "crosslinks"]:
+        assert len(pr[key]) == 5
+        for match, match_pdresult in zip(pr[key], pr_pdresult[key]):
+            for attribute in [
+                "alpha_peptide",
+                "alpha_peptide_crosslink_position",
+                "alpha_proteins",
+                "alpha_proteins_crosslink_positions",
+                "alpha_decoy",
+                "beta_peptide",
+                "beta_peptide_crosslink_position",
+                "beta_proteins",
+                "beta_proteins_crosslink_positions",
+                "beta_decoy",
+                "crosslink_type",
+                "score",
+            ]:
+                assert match[attribute] == match_pdresult[attribute]
+    csm = pr["crosslink-spectrum-matches"][3]
+    assert csm["alpha_peptide"] == "KLAER"
+    assert csm["alpha_proteins"] is None
+    assert csm["alpha_decoy"]
+    assert csm["scan_nr"] == 17383

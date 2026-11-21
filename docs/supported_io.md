@@ -16,7 +16,7 @@ The following crosslink search engines and formats are currently supported:
 |:---------------------|:------------------|:----:|:---:|:--------------------------------------------|:---------|
 | MaxQuant/MaxLynx     | `read_maxquant()` | ✅  | ❌  | `.txt`, any text-like                       | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_maxquant) |
 | MeroX                | `read_merox()`    | ✅  | ❌  | `.csv`, `.zhrm`, any text-like              | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_merox) |
-| MS Annika            | `read_msannika()` | ✅  | ✅  | `.pdResult`, `.xlsx`, `.txt`, any text-like | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_msannika) |
+| MS Annika            | `read_msannika()` | ✅  | ✅  | `.pdResult`, `.msf`, `.xlsx`, `.txt`, any text-like | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_msannika) |
 | pLink 2 & 3          | `read_plink()`    | ✅  | ✅  | `.csv`, any text-like                       | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_plink) |
 | Scout                | `read_scout()`    | ✅  | ✅  | `.csv`, any text-like                       | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_scout) |
 | xiSearch & xiFDR     | `read_xi()`       | ✅  | ✅  | `.csv`, any text-like                       | [link](https://hgb-bin-proteomics.github.io/pyXLMS/pyXLMS.parser.html#pyXLMS.parser.read_xi) |
