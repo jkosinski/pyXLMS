@@ -611,3 +611,35 @@ def test15():
         assert isinstance(xl.additional_information["csm_count"], int)
         assert xl.additional_information["csm_count"] >= 1
     assert crosslinks[0].additional_information["csm_count"] == 26
+
+
+def test16():
+    # residue pairs with separated FDR (PRIDE PXD052022): peptides, 0-based positions
+    # within them and proteins, but no protein crosslink positions
+    import pandas as pd
+    from pyXLMS.parser import detect_scout_filetype, read_scout
+
+    f = "data/scout/PXD052022_filteredSeparated_ResPairs_excerpt.csv"
+    assert detect_scout_filetype(pd.read_csv(f)) == "scout_xl_separated"
+    pr = read_scout(f, crosslinker="DSSO")
+    assert pr["crosslink-spectrum-matches"] is None
+    crosslinks = pr["crosslinks"]
+    assert len(crosslinks) == 5
+    decoy = crosslinks[0]
+    assert decoy.alpha_peptide == "LSTQATEMMIINEAK"
+    assert decoy.alpha_peptide_crosslink_position == 6
+    assert decoy.alpha_proteins == ["Reverse_Q96EP9"]
+    assert decoy.alpha_decoy and decoy.beta_decoy
+    xl = crosslinks[2]
+    assert (xl.alpha_peptide, xl.beta_peptide) == ("NPPLAEALLSGDLEKFSR", "RHQCSIDLKK")
+    assert (
+        xl.alpha_peptide_crosslink_position,
+        xl.beta_peptide_crosslink_position,
+    ) == (
+        15,
+        9,
+    )
+    assert xl.alpha_proteins == ["Q5TDH0"] and xl.beta_proteins == ["Q5TDH0", "Q8WTU0"]
+    assert xl.alpha_proteins_crosslink_positions is None
+    assert not xl.alpha_decoy
+    assert xl.additional_information["csm_count"] == 1
