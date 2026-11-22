@@ -139,7 +139,7 @@ def read_custom(
     - "Beta Peptide": The unmodified amino acid sequence of the second peptide.
     - "Beta Peptide Crosslink Position": The position of the crosslinker in the sequence of the second peptide (1-based).
     - "Spectrum File": Name of the spectrum file the crosslink-spectrum-match was identified in.
-    - "Scan Nr": The corresponding scan number of the crosslink-spectrum-match.
+    - "Scan Nr": The corresponding scan number of the crosslink-spectrum-match, empty if the spectrum has none and is identified by "Spectrum File" alone.
 
     The minimum required columns for crosslink result file are:
 
@@ -458,7 +458,7 @@ def read_custom(
                     decoy_b=get_is_decoy_value(row, decoy_prefix, False),
                     score=get_float(__get_value(row, "CSM Score")),
                     spectrum_file=str(row["Spectrum File"]).strip(),
-                    scan_nr=__parse_int(row["Scan Nr"]),
+                    scan_nr=get_int(__get_value(row, "Scan Nr")),
                     charge=get_int(__get_value(row, "Precursor Charge")),
                     rt=get_float(__get_value(row, "Retention Time")),
                     im_cv=get_float(__get_value(row, "Ion Mobility")),

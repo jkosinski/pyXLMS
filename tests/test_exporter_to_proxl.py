@@ -277,3 +277,47 @@ def test11():
         schema_validation="online",
     )
     assert xml is not None
+
+
+def test_csm_without_scan_number_is_not_exported():
+    # ProXL needs a scan number, a spectrum named only by its title has none
+    from pyXLMS.data import create_csm
+    from pyXLMS.exporter import to_proxl
+
+    csm = create_csm(
+        "KPEPTIDE",
+        None,
+        1,
+        ["Cas9"],
+        [1],
+        [1],
+        None,
+        False,
+        "PKEPTIDE",
+        None,
+        2,
+        ["Cas9"],
+        [10],
+        [9],
+        None,
+        False,
+        100.0,
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        None,
+        3,
+        None,
+        None,
+    )
+    with pytest.raises(
+        ValueError,
+        match="Attribute 'scan_nr' is missing in at least one element but is required!",
+    ):
+        _xml = to_proxl(
+            [csm],
+            fasta_filename="data/_fasta/Cas9_plus10.fasta",
+            search_engine="MeroX",
+            search_engine_version="2.0",
+            score="higher_better",
+            crosslinker="DSS",
+            schema_validation="offline",
+        )

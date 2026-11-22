@@ -1068,3 +1068,27 @@ def test15():
     assert last_csm["charge"] == 3
     assert last_csm["retention_time"] == pytest.approx(7421.657999999999)
     assert last_csm["ion_mobility"] == pytest.approx(0.0)
+
+
+def test_csm_without_scan_number_to_dataframe_and_back():
+    # a spectrum without scan number keeps it None through the pyXLMS format
+    import io
+    from pyXLMS import data
+    from pyXLMS import parser as p
+    from pyXLMS.transform import to_dataframe
+    from pyXLMS.transform import from_dataframe
+
+    title = 'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"'
+    csms = [
+        data.create_csm_min("PEPK", 4, "PKEP", 2, "RUN_1", 1),
+        data.create_csm_min("KPEP", 1, "PEKP", 3, title, None),
+    ]
+    df = to_dataframe(csms)
+    csms_from_df = from_dataframe(df)
+    assert [csm["spectrum_file"] for csm in csms_from_df] == ["RUN_1", title]
+    assert [csm["scan_nr"] for csm in csms_from_df] == [1, None]
+
+    parser_result = p.read_custom(io.StringIO(df.to_csv(index=False)), format="csv")
+    csms_from_csv = parser_result["crosslink-spectrum-matches"]
+    assert [csm["spectrum_file"] for csm in csms_from_csv] == ["RUN_1", title]
+    assert [csm["scan_nr"] for csm in csms_from_csv] == [1, None]

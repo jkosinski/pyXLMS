@@ -618,3 +618,36 @@ def test14():
             23.4,
             -50.0,
         )
+
+
+def test_csm_without_scan_number():
+    # a spectrum without scan number is identified by its spectrum file alone
+    from pyXLMS import data
+
+    csm = data.create_csm(
+        "PEPTIDE",
+        {1: (" Oxidation ", 15.994915)},
+        1,
+        ["PROTEIN"],
+        [1],
+        [1],
+        50.3,
+        False,
+        "EDITPEP",
+        {2: ("Oxidation", 15.994915)},
+        3,
+        ["NIETORP", "PROTEIN"],
+        [7, 4],
+        [5, 2],
+        170.3,
+        False,
+        170.3,
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        None,
+        3,
+        23.4,
+        -50.0,
+    )
+    assert csm["spectrum_file"] == 'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"'
+    assert csm["scan_nr"] is None
+    assert csm["completeness"] == "partial"

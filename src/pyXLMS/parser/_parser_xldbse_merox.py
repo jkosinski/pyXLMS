@@ -424,7 +424,7 @@ def __is_merox_unplaced_decoy(
     )
 
 
-def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
+def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[Optional[str], str]:
     r"""Helper function to split the MeroX scan number string into scan number and spectrum file.
 
     Splits the MeroX scan number string into the scan number and the spectrum file. MeroX
@@ -436,13 +436,14 @@ def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
       ``'run.10031.10031.4 File:"run.raw", NativeID:"controllerType=0 controllerNumber=1 scan=10031"'``.
       The scan number and the spectrum file are taken from the spectrum title.
     - A spectrum title alone, e.g. ``"run.9005.9005.3"``.
+    - A spectrum title of a SCIEX file, e.g. ``'Locus:1.1.1.1409.10 File:"run.wiff"'``. It
+      contains no scan number: the scan number is ``None`` and the whole title, with its file,
+      is returned as the spectrum file, as it identifies the spectrum.
 
     The scan number may be a range of merged scans, e.g. ``"9512-9606"``, or a list of merged
     scans, e.g. ``"NS=2247,2252,2254-2257~run"``, of which the first scan is returned. A leading
     parenthesized annotation, e.g. ``"(-1) "``, a leading ``"NS="``, and a leading ``"sn"`` of
-    the scan number, e.g. ``"NS=sn10318~run"``, are ignored. Spectrum titles of SCIEX files,
-    e.g. ``'Locus:1.1.1.1409.10 File:"run.wiff"'``, contain no scan number and are not
-    supported.
+    the scan number, e.g. ``"NS=sn10318~run"``, are ignored.
 
     Parameters
     ----------
@@ -451,9 +452,9 @@ def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
 
     Returns
     -------
-    tuple of str, str
+    tuple of str or None, str
         The scan number and the spectrum file. The spectrum file is an empty string if
-        it is not given.
+        it is not given. The scan number is ``None`` for a SCIEX spectrum title.
 
     Raises
     ------
@@ -465,12 +466,12 @@ def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
     This function should not be called directly, it is called from ``read_merox()``.
     """
     value = re.sub(r"^\(.*?\)", "", str(scan_nr_and_file).strip()).strip()
+    if value.startswith("Locus:"):
+        return None, value
     value = re.sub(r"^NS=", "", value)
     if "~" in value:
         scan_nr, spectrum_file = value.split("~")[0], value.split("~")[1]
     elif " File:" in value:
-        if value.startswith("Locus:"):
-            raise IndexError(f"Could not parse scan number from SCIEX locus {value}!")
         title = re.fullmatch(r"(.+)\.(\d+)\.\d+\.\d+", value.split(" File:")[0].strip())
         if title is None:
             raise IndexError(f"Could not parse spectrum title from {value}!")
@@ -484,13 +485,14 @@ def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
     return scan_nr.strip(), spectrum_file.strip()
 
 
-def __get_merox_scan_number(scan_nr_and_file: str) -> int:
+def __get_merox_scan_number(scan_nr_and_file: str) -> Optional[int]:
     r"""Helper function to parse the scan number from MeroX.
 
     Parses the scan number from the MeroX scan number string. Supports the formats
     described in ``__split_merox_scan_number()``, e.g. scan number and spectrum file
     delimted by the tilde (wave) sign. If the scan number is a range of merged scans
-    the first scan number is returned.
+    the first scan number is returned. A SCIEX spectrum title contains no scan number,
+    ``None`` is returned.
 
     Parameters
     ----------
@@ -499,8 +501,8 @@ def __get_merox_scan_number(scan_nr_and_file: str) -> int:
 
     Returns
     -------
-    int
-        The parsed scan number.
+    int, or None
+        The parsed scan number, or None if the spectrum title contains no scan number.
 
     Raises
     ------
@@ -513,7 +515,9 @@ def __get_merox_scan_number(scan_nr_and_file: str) -> int:
     """
     scan_nr = None
     try:
-        scan_nr = __parse_int(__split_merox_scan_number(scan_nr_and_file)[0])
+        scan_nr_str = __split_merox_scan_number(scan_nr_and_file)[0]
+        if scan_nr_str is not None:
+            scan_nr = __parse_int(scan_nr_str)
     except Exception as e:
         raise RuntimeError(f"Could not scan number from {scan_nr_and_file}!") from e
     return scan_nr
@@ -738,6 +742,9 @@ def read_merox(
     peptide scores are ``None`` for these.
     If MeroX reports a range of merged scans, the first scan number is used. If the scan
     number is reported without a spectrum file, the spectrum file is an empty string.
+    Spectrum titles of SCIEX files, e.g. ``'Locus:1.1.1.1409.10 File:"run.wiff"'``, contain
+    no scan number: the scan number is ``None`` and the spectrum file is the whole title,
+    which identifies the spectrum.
     If MeroX reports a range of retention times for merged scans, the start of the range
     is used.
     Monolinks (``Peptide2`` is ``0``) and looplinks (``Peptide2`` is ``1``) are skipped and their

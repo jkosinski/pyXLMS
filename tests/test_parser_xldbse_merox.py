@@ -546,6 +546,11 @@ def test9():
             "6b705f9e9cdedd27___Xpl1_001268.raw.-1",
         ),
         ("H225_UV110_TrpAspN.9005.9005.3", 9005, "H225_UV110_TrpAspN"),
+        (
+            'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+            None,
+            'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        ),
     ],
 )
 def test10(scan_nr_and_file, scan_nr, spectrum_file):
@@ -561,8 +566,6 @@ def test11():
 
     with pytest.raises(RuntimeError, match="Could not scan number from"):
         _ = __get_merox_scan_number('scan File:"run.raw"')
-    with pytest.raises(RuntimeError, match="Could not scan number from"):
-        _ = __get_merox_scan_number('Locus:1.1.1.1409.10 File:"run.wiff"')
 
 
 @pytest.mark.parametrize(
@@ -796,3 +799,34 @@ def test_merox_decoy_without_position():
             parse_modifications=False,
             modifications={},
         )
+
+
+def test_merox_sciex_spectrum_titles():
+    # SCIEX spectrum titles (PRIDE deposit PXD024519) contain no scan number, the whole
+    # title identifies the spectrum
+    import io
+    from pyXLMS.parser import read_merox
+    from pyXLMS.transform import unique
+
+    titles = [
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        'Locus:1.1.1.2951.18 File:"TB05_M1.wiff"',
+    ]
+    with open(MEROX1, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    rows = [lines[0]]
+    for line, title in zip(lines[1:4], titles):
+        cells = line.split(";")
+        cells[14] = title
+        rows.append(";".join(cells))
+    pr = read_merox(io.BytesIO("\n".join(rows).encode("utf-8")), crosslinker="DSS")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert [csm["spectrum_file"] for csm in csms] == titles
+    assert [csm["scan_nr"] for csm in csms] == [None, None, None]
+    assert [csm["completeness"] for csm in csms] == ["partial"] * 3
+    best = unique(csms)
+    assert len(best) == 2
+    assert [csm["spectrum_file"] for csm in best] == [titles[0], titles[2]]
+    assert best[0]["score"] == pytest.approx(151)
