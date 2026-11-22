@@ -291,6 +291,7 @@ def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
     - A spectrum title followed by the raw file and native ID, e.g.
       ``'run.10031.10031.4 File:"run.raw", NativeID:"controllerType=0 controllerNumber=1 scan=10031"'``.
       The scan number and the spectrum file are taken from the spectrum title.
+    - A spectrum title alone, e.g. ``"run.9005.9005.3"``.
 
     The scan number may be a range of merged scans, e.g. ``"9512-9606"``, or a list of merged
     scans, e.g. ``"NS=2247,2252,2254-2257~run"``, of which the first scan is returned. A leading
@@ -329,6 +330,9 @@ def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[str, str]:
         title = re.fullmatch(r"(.+)\.(\d+)\.\d+\.\d+", value.split(" File:")[0].strip())
         if title is None:
             raise IndexError(f"Could not parse spectrum title from {value}!")
+        scan_nr, spectrum_file = title.group(2), title.group(1)
+    elif re.fullmatch(r"(.+)\.(\d+)\.\d+\.\d+", value):
+        title = re.fullmatch(r"(.+)\.(\d+)\.\d+\.\d+", value)
         scan_nr, spectrum_file = title.group(2), title.group(1)
     else:
         scan_nr, spectrum_file = value, ""
