@@ -113,6 +113,8 @@ FILETREE                                                                        
 ¦       Cas9_HeLa_Cyt_r1.pdResult                                               | XlinkX        | DSBSO
 ¦       Cas9_HeLa_Cyt_r2.pdResult                                               | XlinkX        | DSBSO
 ¦       Cas9_HeLa_Cyt_r3.pdResult                                               | XlinkX        | DSBSO
+¦       PXD019101_A2M_chymotrypsin_Crosslinks_excerpt.txt                       | XlinkX        | DSSO
+¦       PXD021648_BSA10000prot_Crosslinks_excerpt.txt                           | XlinkX        | DSBU
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.mzid                                  | mzIdentML     | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.pdResult                              | XlinkX        | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3_Crosslinks.txt                        | XlinkX        | DSSO

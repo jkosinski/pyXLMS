@@ -1,0 +1,4 @@
+Sequence A	Sequence B	Modifications A	Modifications B	Crosslinker	Position A	Position B	Accession A	Accession B	Max. XlinkX Score	Is Decoy
+HKP[K]ATEEQLK	TPVSE[K]VTK	1×BuUrBU [K4]	1×BuUrBU [K6]	DSBU	561	495	P02769	P02769	62.7172351393465	False
+LCVLHE[K]TPVSEK	EALMAR	1×Carbamidomethyl [C2]; 1×BuUrBU [K7]	1×Oxidation [M4]; 1×BuUrBU [E1]	DSBU	489	0	P02769	P08253	21.2339968163379	False
+CCT[K]PESER	SLG[K]ERK	2×Carbamidomethyl [C1; C2]; 1×BuUrBU [K4]	1×BuUrBU [K4]	DSBU	463	460	P02769	Q8TDB6	34.0778579536697	False

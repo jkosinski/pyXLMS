@@ -1,0 +1,4 @@
+Sequence A	Sequence B	Modifications A	Modifications B	Crosslinker	Position A	Position B	Accession A	Accession B	Max. XlinkX Score	Is Decoy
+[K]TAQEGDHGSHVY	ALAGNQD[K]RK			DSSO	1110	1139	A2M_secreted	A2M_secreted	339.74158948172	False
+LVHVEEPHTETVR	TYG[K]PVPGHVTV			DSSO	0	235	A2M_bait_region_neoNterminus_3	A2M_secreted	96.0477181826898	False
+R[K]EYEMK				DSSO	291	0	A2M_secreted		159.726694488932	False
