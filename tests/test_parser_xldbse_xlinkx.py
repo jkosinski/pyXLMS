@@ -16,6 +16,8 @@ CSMS_XLSX = "data/xlinkx/XLpeplib_Beveridge_Lumos_DSSO_MS3_CSMs.xlsx"
 CSMS_TSV_PXD007513 = "data/xlinkx/PXD007513_NPM1_XL_CSMs_excerpt.txt"
 CSMS_TSV_PXD031033 = "data/xlinkx/PXD031033_CSMs_excerpt.txt"
 CSMS_TSV_PXD014584 = "data/xlinkx/PXD014584_Nuc_S60D10_CSMs_excerpt.txt"
+# excerpt of public PRIDE deposit PXD021761 (rows of sheet "CSMs" copied verbatim)
+CSMS_TSV_PXD021761 = "data/xlinkx/PXD021761_TRY_RevERb_NCoR1_XLMS_CSMs_excerpt.txt"
 
 
 def test1():
@@ -1382,3 +1384,24 @@ def test19():
     assert csm["alpha_proteins_peptide_positions"] is None
     assert csm["beta_proteins"] is None
     assert csm["alpha_decoy"] and csm["beta_decoy"]
+
+
+def test_xlinkx_csms_without_charge():
+    # older layout without "Charge" column
+    from pyXLMS.parser import read_xlinkx
+
+    pr = read_xlinkx(CSMS_TSV_PXD021761)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert [csm["charge"] for csm in csms] == [None, None, None]
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "KQEIFR"
+    assert csm["alpha_peptide_crosslink_position"] == 1
+    assert csm["alpha_proteins"] == ["NCoR1RID"]
+    assert csm["alpha_proteins_crosslink_positions"] == [167]
+    assert csm["beta_peptide"] == "SLNNMHSEELLAFKVHP"
+    assert csm["beta_proteins"] == ["RevERb"]
+    assert csm["beta_proteins_crosslink_positions"] == [198]
+    assert csm["scan_nr"] == 16477
+    assert csm["retention_time"] == pytest.approx(57.016 * 60.0)
+    assert csm["score"] == pytest.approx(279.65)

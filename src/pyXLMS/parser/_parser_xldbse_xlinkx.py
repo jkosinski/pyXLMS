@@ -253,7 +253,8 @@ def read_xlinkx(
     -----
     Uses ``XlinkX Score`` as the score of the crosslink-spectrum-match for crosslink-spectrum-matches,
     alpha and beta peptide scores are ``None`` for crosslink-spectrum-matches. Uses ``Max. XlinkX Score``
-    as the score of the crosslink for crosslinks.
+    as the score of the crosslink for crosslinks. Crosslink-spectrum-match tables without the column
+    ``Charge`` are read without precursor charges (``None``).
 
     Warnings
     --------
@@ -606,7 +607,9 @@ def read_xlinkx(
                         score=__parse_float(row["XlinkX Score"]),
                         spectrum_file=str(row["Spectrum File"]).strip(),
                         scan_nr=__parse_int(row["First Scan"]),
-                        charge=__parse_int(row["Charge"]),
+                        charge=__parse_int(row["Charge"])
+                        if "Charge" in col_names
+                        else None,
                         rt=__parse_float(row["RT [min]"]) * 60.0,
                         im_cv=None,
                         additional_information={
