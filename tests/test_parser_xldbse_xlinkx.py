@@ -18,6 +18,11 @@ CSMS_TSV_PXD031033 = "data/xlinkx/PXD031033_CSMs_excerpt.txt"
 CSMS_TSV_PXD014584 = "data/xlinkx/PXD014584_Nuc_S60D10_CSMs_excerpt.txt"
 # excerpt of public PRIDE deposit PXD021761 (rows of sheet "CSMs" copied verbatim)
 CSMS_TSV_PXD021761 = "data/xlinkx/PXD021761_TRY_RevERb_NCoR1_XLMS_CSMs_excerpt.txt"
+# excerpts of the Crosslinks tables of .pdResult files of public PRIDE deposits PXD021648
+# and PXD019101 (rows copied verbatim, columns named as read_xlinkx names them, "Is Decoy"
+# False as read_xlinkx gives the crosslinks of these files, which have no decoy column)
+XL_TSV_PXD021648 = "data/xlinkx/PXD021648_BSA10000prot_Crosslinks_excerpt.txt"
+XL_TSV_PXD019101 = "data/xlinkx/PXD019101_A2M_chymotrypsin_Crosslinks_excerpt.txt"
 
 
 def test1():
@@ -1405,3 +1410,39 @@ def test_xlinkx_csms_without_charge():
     assert csm["scan_nr"] == 16477
     assert csm["retention_time"] == pytest.approx(57.016 * 60.0)
     assert csm["score"] == pytest.approx(279.65)
+
+
+def test_xlinkx_nterminal_crosslinks():
+    # a peptide without brackets is crosslinked at its N-terminus, also if its modifications
+    # name the crosslinker differently ("BuUrBU" for DSBU)
+    from pyXLMS.parser import read_xlinkx
+
+    pr = read_xlinkx(XL_TSV_PXD021648)
+    crosslinks = pr["crosslinks"]
+    assert len(crosslinks) == 3
+    xl = crosslinks[1]
+    assert xl["alpha_peptide"] == "EALMAR"
+    assert xl["alpha_peptide_crosslink_position"] == 1
+    assert xl["alpha_proteins"] == ["P08253"]
+    assert xl["beta_peptide"] == "LCVLHEKTPVSEK"
+    assert xl["beta_peptide_crosslink_position"] == 7
+    assert [xl["alpha_peptide_crosslink_position"] for xl in crosslinks] == [4, 1, 4]
+
+
+def test_xlinkx_crosslinks_without_second_peptide():
+    # a peptide without brackets and modifications, and a crosslink without second peptide
+    from pyXLMS.parser import read_xlinkx
+
+    with pytest.warns(
+        RuntimeWarning,
+        match=r"Skipped 1 crosslink rows without a peptide in column 'Sequence A' or 'Sequence B'!",
+    ):
+        pr = read_xlinkx(XL_TSV_PXD019101)
+    crosslinks = pr["crosslinks"]
+    assert len(crosslinks) == 2
+    xl = crosslinks[1]
+    assert xl["alpha_peptide"] == "LVHVEEPHTETVR"
+    assert xl["alpha_peptide_crosslink_position"] == 1
+    assert xl["alpha_proteins"] == ["A2M_bait_region_neoNterminus_3"]
+    assert xl["beta_peptide"] == "TYGKPVPGHVTV"
+    assert xl["beta_peptide_crosslink_position"] == 4

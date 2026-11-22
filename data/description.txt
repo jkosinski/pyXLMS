@@ -131,6 +131,8 @@ FILETREE                                                                        
 ¦       PXD021761_TRY_RevERb_NCoR1_XLMS_CSMs_excerpt.txt                        | XlinkX        | DSSO
 ¦       PXD031033_CSMs_excerpt.txt                                              | XlinkX        | DSSO
 ¦       PXD019215_f3_excerpt.pdResult                                           | XlinkX        | MC4
+¦       PXD019101_A2M_chymotrypsin_Crosslinks_excerpt.txt                       | XlinkX        | DSSO
+¦       PXD021648_BSA10000prot_Crosslinks_excerpt.txt                           | XlinkX        | DSBU
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.mzid                                  | mzIdentML     | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3.pdResult                              | XlinkX        | DSSO
 ¦       XLpeplib_Beveridge_Lumos_DSSO_MS3_Crosslinks.txt                        | XlinkX        | DSSO

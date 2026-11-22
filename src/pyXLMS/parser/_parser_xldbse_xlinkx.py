@@ -255,6 +255,10 @@ def read_xlinkx(
     alpha and beta peptide scores are ``None`` for crosslink-spectrum-matches. Uses ``Max. XlinkX Score``
     as the score of the crosslink for crosslinks. Crosslink-spectrum-match tables without the column
     ``Charge`` are read without precursor charges (``None``).
+    XlinkX writes the crosslinked residue of a peptide in brackets, e.g. ``"TYG[K]PVPGHVTV"``. A peptide
+    written without brackets is crosslinked at its N-terminus, its crosslink position is ``1``. Crosslinks
+    with an empty "Sequence A" or "Sequence B" are skipped and their number is reported in a warning
+    (unless ``verbose = 0``).
 
     Warnings
     --------
@@ -342,6 +346,10 @@ def read_xlinkx(
         for i, aa in enumerate(seq):
             if aa == "[":
                 return i + 1
+        # XlinkX brackets the crosslinked residue of a peptide, except for a peptide
+        # crosslinked at its N-terminal amine, which is written without bracket
+        if seq.isalpha() and seq.isupper():
+            return 1
         for mod in mods:
             if xl in mod:
                 mod_pos: str = mod.split("[")[-1].split("]")[0].strip()
@@ -389,6 +397,7 @@ def read_xlinkx(
     ## data structures
     crosslinks = list()
     csms = list()
+    skipped_crosslinks = 0
 
     ## handle input
     if not isinstance(files, list):
@@ -469,6 +478,13 @@ def read_xlinkx(
                     total=data.shape[0],
                     desc="Reading XlinkX crosslinks...",
                 ):
+                    # crosslinks without a second peptide are not read
+                    if any(
+                        pd.isna(row[column]) or str(row[column]).strip() == ""
+                        for column in ["Sequence A", "Sequence B"]
+                    ):
+                        skipped_crosslinks += 1
+                        continue
                     # create crosslink
                     crosslink = create_crosslink(
                         peptide_a=format_sequence(str(row["Sequence A"])),
@@ -617,6 +633,15 @@ def read_xlinkx(
                         },
                     )
                     csms.append(csm)
+    ## report skipped crosslinks
+    if skipped_crosslinks > 0 and verbose != 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Skipped {skipped_crosslinks} crosslink rows without a peptide in "
+                "column 'Sequence A' or 'Sequence B'!"
+            ),
+            stacklevel=2,
+        )
     ## check results
     if len(crosslinks) + len(csms) == 0:
         raise RuntimeError(
