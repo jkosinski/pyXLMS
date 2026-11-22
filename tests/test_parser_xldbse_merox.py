@@ -545,6 +545,7 @@ def test9():
             10318,
             "6b705f9e9cdedd27___Xpl1_001268.raw.-1",
         ),
+        ("H225_UV110_TrpAspN.9005.9005.3", 9005, "H225_UV110_TrpAspN"),
     ],
 )
 def test10(scan_nr_and_file, scan_nr, spectrum_file):
