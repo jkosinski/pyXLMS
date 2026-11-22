@@ -40,11 +40,13 @@ else:
 
 def detect_scout_filetype(
     data: pd.DataFrame,
-) -> Literal["scout_csms_unfiltered", "scout_csms_filtered", "scout_xl"]:
+) -> Literal[
+    "scout_csms_unfiltered", "scout_csms_filtered", "scout_xl", "scout_xl_separated"
+]:
     r"""Detects the Scout-related source of the data.
 
     Detects whether the input data is unfiltered crosslink-spectrum-matches, filtered crosslink-spectrum-matches,
-    or crosslinks from Scout.
+    crosslinks, or residue pairs of a separated FDR export from Scout.
 
     Parameters
     ----------
@@ -55,7 +57,8 @@ def detect_scout_filetype(
     -------
     str
         "scout_csms_unfiltered" if a Scout unfiltered CSMs file was read, "scout_csms_filtered" if a Scout filtered CSMs file was read,
-        "scout_xl" if a Scout crosslink/residue pair result file was read.
+        "scout_xl" if a Scout crosslink/residue pair result file was read, "scout_xl_separated" if a
+        Scout residue pair result file with separated FDR (``*_filteredSeparated_ResPairs.csv``) was read.
 
     Raises
     ------
@@ -92,6 +95,10 @@ def detect_scout_filetype(
         return "scout_csms_filtered"
     if "CSM count" in col_names:
         return "scout_xl"
+    if all(
+        col in col_names for col in ["ResPair", "AlphaPos", "BetaPos", "ProtLocus 1"]
+    ):
+        return "scout_xl_separated"
 
     raise ValueError(
         "Could not infer data source, are you sure you read a Scout result file?"
@@ -769,6 +776,67 @@ def __read_scout_crosslinks(
     return crosslinks
 
 
+def __read_scout_separated_residue_pairs(data: pd.DataFrame) -> List[Crosslink]:
+    r"""Reads crosslinks from a Scout residue pair result with separated FDR.
+
+    The residue pairs of a separated FDR export (``*_filteredSeparated_ResPairs.csv``) give
+    the two peptides in column "ResPair" (joined by ``_``), the 0-based crosslink positions
+    within them in columns "AlphaPos" and "BetaPos", and their proteins in columns
+    "ProtLocus 1" and "ProtLocus 2" (comma-separated), but no protein crosslink positions.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        The Scout residue pair result data.
+
+    Returns
+    -------
+    list of Crosslink
+        The read crosslinks.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_scout()``.
+    """
+    crosslinks = list()
+    xl = data.dropna(axis=0, subset=["ResPair", "AlphaPos", "BetaPos"])
+    for _i, row in tqdm(
+        xl.iterrows(), total=xl.shape[0], desc="Reading Scout residue pairs..."
+    ):
+        peptides = str(row["ResPair"]).strip().split("_")
+        if len(peptides) != 2:
+            raise ValueError(
+                f"Could not read the two peptides of Scout residue pair {row['ResPair']}!"
+            )
+        crosslink = create_crosslink(
+            peptide_a=format_sequence(peptides[0]),
+            xl_position_peptide_a=__parse_int(row["AlphaPos"]) + 1,
+            proteins_a=[
+                protein.strip() for protein in str(row["ProtLocus 1"]).split(",")
+            ],
+            xl_position_proteins_a=None,
+            decoy_a=get_bool_from_value(row["IsDecoy"]),
+            peptide_b=format_sequence(peptides[1]),
+            xl_position_peptide_b=__parse_int(row["BetaPos"]) + 1,
+            proteins_b=[
+                protein.strip() for protein in str(row["ProtLocus 2"]).split(",")
+            ],
+            xl_position_proteins_b=None,
+            decoy_b=get_bool_from_value(row["IsDecoy"]),
+            score=__parse_float(row["Score"]),
+            additional_information={
+                "source": __serialize_pandas_series(row),
+                **(
+                    {"csm_count": __parse_int(row["CsmCount"])}
+                    if "CsmCount" in row and pd.notna(row["CsmCount"])
+                    else {}
+                ),
+            },
+        )
+        crosslinks.append(crosslink)
+    return crosslinks
+
+
 def read_scout(
     files: str | List[str] | BinaryIO,
     crosslinker: str,
@@ -852,6 +920,8 @@ def read_scout(
     - When reading crosslinks / residue pairs, Scout reports only the unique protein crosslink positions of a peptide. If all
       proteins share one position, or one protein has several positions, they are paired accordingly. Otherwise the protein
       crosslink positions of that peptide are set to ``None`` and should be annotated with ``transform.reannotate_positions()``.
+    - When reading residue pairs with separated FDR (``*_filteredSeparated_ResPairs.csv``), no protein crosslink positions
+      are available, as these are not reported. If needed they should be annotated with ``transform.reannotate_positions()``.
 
     Examples
     --------
@@ -924,6 +994,8 @@ def read_scout(
                 modifications,
                 verbose,
             )
+        elif scout_file_type == "scout_xl_separated":
+            crosslinks += __read_scout_separated_residue_pairs(data)
         else:
             crosslinks += __read_scout_crosslinks(data, verbose)
 
