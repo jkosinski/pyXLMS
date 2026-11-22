@@ -43,7 +43,7 @@ may be `None`:
 | "crosslink_type"                     | `Literal["inter", "intra"]`           | ✅ | If it is an inter- or intra-crosslink. |
 | "score"                              | `float`                               | ❌ | Score of the crosslink-spectrum-match. |
 | "spectrum_file"                      | `str`                                 | ✅ | Name of the spectrum file the crosslink-spectrum-match was identified in. |
-| "scan_nr"                            | `int`                                 | ✅ | The corresponding scan number of the crosslink-spectrum-match. |
+| "scan_nr"                            | `int`                                 | ❌ | The corresponding scan number of the crosslink-spectrum-match. `None` if the spectrum has no scan number, e.g. one named only by its title: the title is then given as "spectrum_file" and identifies the spectrum. |
 | "charge"                             | `int`                                 | ❌ | The precursor charge of the corresponding mass spectrum of the crosslink-spectrum-match. |
 | "retention_time"                     | `float`                               | ❌ | The retention time of the corresponding mass spectrum of the crosslink-spectrum-match in seconds. |
 | "ion_mobility"                       | `float`                               | ❌ | The ion mobility or compensation voltage of the corresponding mass spectrum of the crosslink-spectrum-match. |

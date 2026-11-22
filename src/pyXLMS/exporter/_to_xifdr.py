@@ -107,8 +107,8 @@ def to_xifdr(
     via the link
     `rappsilberlab.org/software/xifdr <https://www.rappsilberlab.org/software/xifdr/>`_.
     Requires that ``alpha_proteins``, ``beta_proteins``, ``alpha_proteins_peptide_positions``,
-    ``beta_proteins_peptide_positions``, ``alpha_decoy``, ``beta_decoy``, ``charge`` and ``score``
-    fields are set for all crosslink-spectrum-matches.
+    ``beta_proteins_peptide_positions``, ``alpha_decoy``, ``beta_decoy``, ``charge``, ``scan_nr``
+    and ``score`` fields are set for all crosslink-spectrum-matches.
 
     Parameters
     ----------
@@ -186,6 +186,7 @@ def to_xifdr(
             "alpha_decoy",
             "beta_decoy",
             "charge",
+            "scan_nr",
             "score",
         ],
         csms,

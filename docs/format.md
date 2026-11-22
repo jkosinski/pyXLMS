@@ -28,7 +28,7 @@ Data required for parsing crosslink-spectrum-matches:
 | Beta Decoy                         | ❌       | bool, str | False     | True          | Whether the beta peptide is from the target (False) or decoy (True) database |
 | CSM Score                          | ❌       | float     | 0.99513   | 170.3         | Score of the crosslink-spectrum-match |
 | Spectrum File                      | ✅       | str       | 2025_03_17_EXP1_RUN3_R1.raw | 2025_03_17_EXP1_RUN3_R1 | File name of the spectrum file |
-| Scan Nr                            | ✅       | int       | 1703      | 38901         | The scan number of the spectrum the match was identified in |
+| Scan Nr                            | ✅       | int       | 1703      | 38901         | The scan number of the spectrum the match was identified in, empty if the spectrum has none (the Spectrum File then identifies the spectrum) |
 | Precursor Charge                   | ❌       | int       | 3         | 4             | Precursor charge of the crosslink spectrum |
 | Retention Time                     | ❌       | float     | 530.17    | 1701.7        | Retention time of the crosslink spectrum in seconds |
 | Ion Mobility                       | ❌       | float     | 170.41    | -50.0         | Ion mobility, CCS, or compensation voltage of the crosslink spectrum |
