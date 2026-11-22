@@ -520,3 +520,22 @@ def test11(tmp_path):
     pr = read_merox(str(file), crosslinker="DSS", decimal=",")
     csms = pr["crosslink-spectrum-matches"]
     assert [csm["retention_time"] for csm in csms] == pytest.approx([1854.5, 1904.5])
+
+
+def test12(tmp_path):
+    # tables without the retention time column are read without retention times
+    import pandas as pd
+    from pyXLMS.parser import read_merox
+
+    data = pd.read_csv(MEROX1, sep=";")
+    data = data.drop(columns=["Retention time in sec"])
+    file = tmp_path / "no_retention_time.csv"
+    data.to_csv(file, sep=";", index=False)
+    pr = read_merox(str(file), crosslinker="DSS")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 93
+    assert all(csm["retention_time"] is None for csm in csms)
+    expected = read_merox(MEROX1, crosslinker="DSS")["crosslink-spectrum-matches"]
+    assert [csm["scan_nr"] for csm in csms] == [csm["scan_nr"] for csm in expected]
+    assert [csm["charge"] for csm in csms] == [csm["charge"] for csm in expected]
+    assert [csm["score"] for csm in csms] == [csm["score"] for csm in expected]

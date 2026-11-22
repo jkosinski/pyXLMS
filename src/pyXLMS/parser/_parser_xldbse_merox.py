@@ -453,7 +453,8 @@ def read_merox(
     Uses ``pepScore1`` as the score for the alpha peptide, ``pepScore2`` as the score of the
     beta peptide, and ``Score`` as the score of the crosslink-spectrum-match.
     If MeroX reports a range of retention times for merged scans, the start of the range
-    is used.
+    is used. Tables without the column "Retention time in sec" are read without retention
+    times (``None``).
 
     Warnings
     --------
@@ -576,7 +577,9 @@ def read_merox(
                 spectrum_file=__get_merox_spectrum_file(str(row["Scan number"])),
                 scan_nr=__get_merox_scan_number(str(row["Scan number"])),
                 charge=__parse_int(row["Charge"]),
-                rt=__get_merox_retention_time(row["Retention time in sec"], decimal),
+                rt=__get_merox_retention_time(row["Retention time in sec"], decimal)
+                if "Retention time in sec" in row.index
+                else None,
                 im_cv=None,
                 additional_information={
                     "source": __serialize_pandas_series(row),
