@@ -337,8 +337,11 @@ def __get_merox_protein(proteins: str) -> List[str]:
     r"""Helper function to extract the protein accession from MeroX.
 
     Parses the leading protein accession from the MeroX protein string. Additional
-    proteins are not parsed as they do not have corresponding protein crosslink
-    positions. MeroX writes the decoy proteins it generates as ``"DEC_>"`` followed by
+    proteins in parentheses are not parsed as they do not have corresponding protein
+    crosslink positions. A peptide shared by several proteins is written as their
+    accessions joined by ``" and "`` followed by the peptide's range, e.g.
+    ``">sp|P0DMV9|HS71B_HUMAN and >sp|P0DMV8|HS71A_HUMAN@510-517"``; each protein is
+    returned once. MeroX writes the decoy proteins it generates as ``"DEC_>"`` followed by
     the accession of the target protein, e.g. ``"DEC_>Cas9"``; these are returned as
     ``"DEC_Cas9"``.
 
@@ -350,16 +353,61 @@ def __get_merox_protein(proteins: str) -> List[str]:
     Returns
     -------
     list of str
-        A list containing the single parsed protein accession.
+        A list containing the parsed protein accession(s).
 
     Notes
     -----
     This function should not be called directly, it is called from ``read_merox()``.
     """
-    protein = proteins.split("(>")[0].strip()
-    if protein.startswith(MEROX_DECOY_PREFIX + ">"):
-        protein = MEROX_DECOY_PREFIX + protein[len(MEROX_DECOY_PREFIX) + 1 :]
-    return [protein.lstrip(">")]
+    accessions = list()
+    for protein in __split_merox_shared_proteins(proteins):
+        accession = protein.split("(>")[0].strip()
+        if accession.startswith(MEROX_DECOY_PREFIX + ">"):
+            accession = MEROX_DECOY_PREFIX + accession[len(MEROX_DECOY_PREFIX) + 1 :]
+        accession = accession.lstrip(">")
+        if accession not in accessions:
+            accessions.append(accession)
+    return accessions
+
+
+def __split_merox_shared_proteins(proteins: str) -> List[str]:
+    r"""Helper function to split a MeroX protein string into the proteins of a shared peptide.
+
+    MeroX joins the proteins of a peptide shared by several proteins with ``" and "`` and
+    appends the peptide's range, e.g. ``">A and >B@510-517"``. The string is split at each
+    ``" and "`` followed by a protein (``">"`` or ``"DEC_>"``) outside parentheses, and the
+    range is removed from the last protein.
+
+    Parameters
+    ----------
+    proteins : str
+        The protein string from MeroX e.g. from column "Protein 1".
+
+    Returns
+    -------
+    list of str
+        The protein strings, one for a peptide that is not shared.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    parts = list()
+    depth = 0
+    start = 0
+    for match in re.finditer(r"[()]|\s+and\s+(?=(?:DEC_)?>)", proteins):
+        separator = match.group(0)
+        if separator == "(":
+            depth += 1
+        elif separator == ")":
+            depth = max(depth - 1, 0)
+        elif depth == 0:
+            parts.append(proteins[start : match.start()])
+            start = match.end()
+    parts.append(proteins[start:])
+    if len(parts) > 1:
+        parts[-1] = re.sub(r"@\d*-?\d*\s*$", "", parts[-1])
+    return parts
 
 
 def __is_merox_decoy(protein: str, decoy_prefix: str) -> bool:
@@ -644,8 +692,9 @@ def parse_site_from_merox(
     dict of str, any
         The linked site, a dictionary with keys ``peptide`` (str), ``peptide_position`` (int,
         1-based, in-peptide), ``proteins`` (list of str, accessions) and ``protein_positions``
-        (list of int, 1-based, absolute; parallel to ``proteins``). MeroX reports a single
-        protein per peptide.
+        (list of int, 1-based, absolute; parallel to ``proteins``). For a peptide shared by
+        several proteins, or found several times in one (accessions joined by ``" and "``),
+        the protein positions are ``None``: MeroX reports one position of the peptide only.
 
     Raises
     ------
@@ -673,7 +722,9 @@ def parse_site_from_merox(
         ),
         "peptide_position": peptide_position,
         "proteins": __get_merox_protein(str(protein)),
-        "protein_positions": [
+        "protein_positions": None
+        if len(__split_merox_shared_proteins(str(protein))) > 1
+        else [
             __get_merox_peptide_position(peptide_start, str(peptide))
             + peptide_position
             - 1
@@ -750,6 +801,10 @@ def read_merox(
     times (``None``).
     Monolinks (``Peptide2`` is ``0``) and looplinks (``Peptide2`` is ``1``) are skipped and their
     number is reported in a warning.
+    A peptide shared by several proteins (accessions joined by ``" and "``, e.g.
+    ``">sp|P0DMV9|HS71B_HUMAN and >sp|P0DMV8|HS71A_HUMAN@510-517"``) is read with all of its
+    proteins and without protein positions, since MeroX reports the position in one of the
+    proteins only; their number is reported in a warning.
 
     Warnings
     --------
@@ -802,6 +857,7 @@ def read_merox(
     skipped_monolinks = 0
     skipped_looplinks = 0
     unplaced_decoys = 0
+    shared_peptides = 0
 
     ## handle input
     if not isinstance(files, list):
@@ -849,6 +905,9 @@ def read_merox(
                 str(row["Protein 2"]), row["From.1"], str(row["Peptide2"]), decoy_prefix
             )
             unplaced_decoys += int(unplaced_a) + int(unplaced_b)
+            shared_peptides += int(site_a["protein_positions"] is None) + int(
+                site_b["protein_positions"] is None
+            )
             # create crosslink
             csm = create_csm(
                 peptide_a=site_a["peptide"],
@@ -867,7 +926,7 @@ def read_merox(
                 if unplaced_a
                 else site_a["protein_positions"],
                 pep_position_proteins_a=None
-                if unplaced_a
+                if unplaced_a or site_a["protein_positions"] is None
                 else [__get_merox_peptide_position(row["From"], str(row["Peptide 1"]))],
                 score_a=__parse_float(row["pepScore1"])
                 if "pepScore1" in row.index
@@ -889,7 +948,7 @@ def read_merox(
                 if unplaced_b
                 else site_b["protein_positions"],
                 pep_position_proteins_b=None
-                if unplaced_b
+                if unplaced_b or site_b["protein_positions"] is None
                 else [
                     __get_merox_peptide_position(row["From.1"], str(row["Peptide2"]))
                 ],
@@ -920,6 +979,15 @@ def read_merox(
             RuntimeWarning(
                 f"Skipped {skipped_monolinks} monolink and {skipped_looplinks} looplink "
                 "rows, only crosslinks are read!"
+            ),
+            stacklevel=2,
+        )
+    ## report peptides shared by several proteins
+    if shared_peptides > 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Read {shared_peptides} peptide(s) shared by several proteins without protein "
+                "positions, MeroX reports the position in one of the proteins only!"
             ),
             stacklevel=2,
         )
