@@ -1,6 +1,7 @@
 FILETREE                                                                        | ENGINE        | CROSSLINKER
 --------------------------------------------------------------------------------|---------------|------------
 +---maxquant                                                                    |               |
+¦   ¦   PXD027159_DSBU_crosslinkMsms_excerpt.txt                                | MaxQuant      | DSBU
 ¦   ¦   PXD044723_crosslinkMsms_excerpt.txt                                     | MaxLynx       | DSBU
 ¦   ¦                                                                           |               |
 ¦   +---run1                                                                    |               |
