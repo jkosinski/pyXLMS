@@ -1,3 +1,0 @@
-Sequence,Crosslink Type,Sequence A,Crosslinker Position A,Accession A,A in protein,Score Alpha,Alpha T/D,Sequence B,Crosslinker Position B,Accession B,B in protein,Score Beta,Beta T/D,Combined Score,Spectrum File,First Scan,Charge,RT [min],Compensation Voltage
-KPEPTIDE-PKEPTIDE,Inter,KPEPTIDE,1,,,,,PKEPTIDE,2,,,,,,RUN_1,1,,,
-PEKPTIDE-PEPKTIDE,Inter,PEKPTIDE,3,,,,,PEPKTIDE,4,,,,,,RUN_1,2,,,
