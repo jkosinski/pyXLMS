@@ -551,6 +551,42 @@ def test9():
             None,
             'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
         ),
+        # spectrum title with annotations (PRIDE deposit PXD031339)
+        (
+            'QE35501LM.1633.1633.4 MSn:"707.854395877474" RTmin:"16.776091999999998" '
+            'File:"QE35501LM.raw", NativeID:"controllerType=0 controllerNumber=1 scan=1633"',
+            1633,
+            "QE35501LM",
+        ),
+        # the same scan number written with leading zeros
+        (
+            'run.001633.001633.4 File:"run.raw", NativeID:"controllerType=0 scan=1633"',
+            1633,
+            "run",
+        ),
+        # StavroX (PRIDE deposit PXD028039)
+        ("3324_AJ_Dimer-Tryp|3953", 3953, "3324_AJ_Dimer-Tryp"),
+        # Bruker timsTOF (PRIDE deposit PXD027234), no scan number
+        (
+            "(-1) 11238 +MS2(650.0308), 32.6eV, 52.2min, 1/K0=0.850 #17538-17540|"
+            "count(pasefframemsmsinfo.precursor)=3|delta=25|Id=11238|AverageMz=650.4381726071|"
+            "MonoisotopicMz=650.030798142347|Charge=3|Intensity=7751|"
+            "ScanNumber=1161.06182295069~BSA_DSAU125_1",
+            None,
+            "11238 +MS2(650.0308), 32.6eV, 52.2min, 1/K0=0.850 #17538-17540|"
+            "count(pasefframemsmsinfo.precursor)=3|delta=25|Id=11238|AverageMz=650.4381726071|"
+            "MonoisotopicMz=650.030798142347|Charge=3|Intensity=7751|"
+            "ScanNumber=1161.06182295069~BSA_DSAU125_1",
+        ),
+        (
+            "10067, 10078 +MS2(647.7008), 35.6eV, 53.6min, 1/K0=0.858 #17593-17607|"
+            "Id=10067|Charge=3~Ribosome_DSBU_1",
+            None,
+            "10067, 10078 +MS2(647.7008), 35.6eV, 53.6min, 1/K0=0.858 #17593-17607|"
+            "Id=10067|Charge=3~Ribosome_DSBU_1",
+        ),
+        # no spectrum title (PRIDE deposit PXD021872)
+        ("N/A", None, ""),
     ],
 )
 def test10(scan_nr_and_file, scan_nr, spectrum_file):
@@ -850,3 +886,12 @@ def test_merox_without_retention_time(tmp_path):
     assert [csm["scan_nr"] for csm in csms] == [csm["scan_nr"] for csm in expected]
     assert [csm["charge"] for csm in csms] == [csm["charge"] for csm in expected]
     assert [csm["score"] for csm in csms] == [csm["score"] for csm in expected]
+
+
+def test_merox_scan_number_of_title_and_native_id_differ():
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_scan_number
+
+    with pytest.raises(RuntimeError, match="Could not scan number from"):
+        _ = __get_merox_scan_number(
+            'run.1633.1633.4 File:"run.raw", NativeID:"controllerType=0 scan=1634"'
+        )
