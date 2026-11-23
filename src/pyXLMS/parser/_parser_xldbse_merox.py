@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 import pandas as pd
 from tqdm import tqdm
@@ -346,11 +347,35 @@ def __get_merox_protein(proteins: str) -> List[str]:
     return [proteins.split("(>")[0].strip().lstrip(">")]
 
 
-def __get_merox_scan_number(scan_nr_and_file: str) -> int:
-    r"""Helper function to parse the scan number from MeroX.
+def __split_merox_scan_number(scan_nr_and_file: str) -> Tuple[Optional[str], str]:
+    r"""Helper function to split the MeroX scan number string into scan number and spectrum file.
 
-    Parses the scan number from the MeroX scan number string. Assumes that scan
-    number and spectrum file are delimted by the tilde (wave) sign.
+    Splits the MeroX scan number string into the scan number and the spectrum file. MeroX
+    writes the following formats:
+
+    - ``scan~file``, e.g. ``"10061~XLpeplib_Beveridge_QEx-HFX_DSS_R1"``.
+    - ``scan`` without a spectrum file, e.g. ``"7755"``.
+    - A spectrum title followed by the raw file and native ID, e.g.
+      ``'run.10031.10031.4 File:"run.raw", NativeID:"controllerType=0 controllerNumber=1 scan=10031"'``.
+      The scan number and the spectrum file are taken from the spectrum title.
+      The spectrum title may be followed by annotations, e.g.
+      ``'run.1633.1633.4 MSn:"707.85" RTmin:"16.78" File:"run.raw", NativeID:"... scan=1633"'``.
+    - ``file|scan`` (StavroX), e.g. ``"3324_AJ_Dimer-Tryp|3953"``.
+    - A spectrum title of a SCIEX file, e.g. ``'Locus:1.1.1.1409.10 File:"run.wiff"'``. It
+      contains no scan number: the scan number is ``None`` and the whole title, with its file,
+      is returned as the spectrum file, as it identifies the spectrum.
+    - A spectrum title of a Bruker timsTOF (PASEF) file, e.g.
+      ``"11238 +MS2(650.0308), 32.6eV, 52.2min, 1/K0=0.850 #17538-17540|...|Id=11238|...~run"``.
+      It gives the precursor (``Id``), the merged frames (``#``) and a mobility scan, but no
+      scan number: as for SCIEX titles, the scan number is ``None`` and the whole title is the
+      spectrum file.
+    - No spectrum title (``"N/A"``): the scan number is ``None`` and the spectrum file is an
+      empty string.
+
+    The scan number may be a range of merged scans, e.g. ``"9512-9606"``, or a list of merged
+    scans, e.g. ``"NS=2247,2252,2254-2257~run"``, of which the first scan is returned. A leading
+    parenthesized annotation, e.g. ``"(-1) "``, a leading ``"NS="``, and a leading ``"sn"`` of
+    the scan number, e.g. ``"NS=sn10318~run"``, are ignored.
 
     Parameters
     ----------
@@ -359,8 +384,66 @@ def __get_merox_scan_number(scan_nr_and_file: str) -> int:
 
     Returns
     -------
-    int
-        The parsed scan number.
+    tuple of str or None, str
+        The scan number and the spectrum file. The spectrum file is an empty string if
+        it is not given. The scan number is ``None`` for a SCIEX or timsTOF spectrum title,
+        and if no spectrum title is given.
+
+    Raises
+    ------
+    IndexError
+        If the spectrum title could not be parsed.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    value = re.sub(r"^\(.*?\)", "", str(scan_nr_and_file).strip()).strip()
+    if value in ["", "nan", "N/A"]:
+        return None, ""
+    if value.startswith("Locus:") or re.match(r"[\d, ]+ \+MS2\(", value):
+        return None, value
+    value = re.sub(r"^NS=", "", value)
+    if "~" in value:
+        scan_nr, spectrum_file = value.split("~")[0], value.split("~")[1]
+    elif re.fullmatch(r"(.+)\|(\d+)", value):
+        spectrum_file, scan_nr = value.rsplit("|", 1)
+    elif " File:" in value:
+        # the title may be followed by annotations, e.g. 'MSn:"707.85" RTmin:"16.77"'
+        title_str = re.sub(r'(\s+\w+:"[^"]*")+$', "", value.split(" File:")[0].strip())
+        title = re.fullmatch(r"(.+)\.(\d+)\.\d+\.\d+", title_str)
+        if title is None:
+            raise IndexError(f"Could not parse spectrum title from {value}!")
+        scan_nr, spectrum_file = title.group(2), title.group(1)
+        native_scan = re.search(r'NativeID:"[^"]*\bscan=(\d+)', value)
+        if native_scan is not None and int(native_scan.group(1)) != int(scan_nr):
+            raise IndexError(
+                f"Scan number of spectrum title and native ID differ in {value}!"
+            )
+    else:
+        scan_nr, spectrum_file = value, ""
+    scan_nr = re.sub(r"^sn", "", scan_nr.split(",")[0].split("-")[0].strip())
+    return scan_nr.strip(), spectrum_file.strip()
+
+
+def __get_merox_scan_number(scan_nr_and_file: str) -> Optional[int]:
+    r"""Helper function to parse the scan number from MeroX.
+
+    Parses the scan number from the MeroX scan number string. Supports the formats
+    described in ``__split_merox_scan_number()``, e.g. scan number and spectrum file
+    delimted by the tilde (wave) sign. If the scan number is a range of merged scans
+    the first scan number is returned. A SCIEX or timsTOF spectrum title contains no scan
+    number, ``None`` is returned, as it is if no spectrum title is given.
+
+    Parameters
+    ----------
+    scan_nr_and_file : str
+        The scan number string from MeroX e.g. from the column "Scan number".
+
+    Returns
+    -------
+    int, or None
+        The parsed scan number, or None if the spectrum title contains no scan number.
 
     Raises
     ------
@@ -373,7 +456,9 @@ def __get_merox_scan_number(scan_nr_and_file: str) -> int:
     """
     scan_nr = None
     try:
-        scan_nr = __parse_int(scan_nr_and_file.split("~")[0])
+        scan_nr_str = __split_merox_scan_number(scan_nr_and_file)[0]
+        if scan_nr_str is not None:
+            scan_nr = __parse_int(scan_nr_str)
     except Exception as e:
         raise RuntimeError(f"Could not scan number from {scan_nr_and_file}!") from e
     return scan_nr
@@ -382,8 +467,10 @@ def __get_merox_scan_number(scan_nr_and_file: str) -> int:
 def __get_merox_spectrum_file(scan_nr_and_file: str) -> str:
     r"""Helper function to parse the spectrum file from MeroX.
 
-    Parses the spectrum file from the MeroX scan number string. Assumes that scan
-    number and spectrum file are delimted by the tilde (wave) sign.
+    Parses the spectrum file from the MeroX scan number string. Supports the formats
+    described in ``__split_merox_scan_number()``, e.g. scan number and spectrum file
+    delimted by the tilde (wave) sign. If the scan number string does not contain a
+    spectrum file an empty string is returned.
 
     Parameters
     ----------
@@ -406,7 +493,7 @@ def __get_merox_spectrum_file(scan_nr_and_file: str) -> str:
     """
     spectrum_file = None
     try:
-        spectrum_file = scan_nr_and_file.split("~")[1]
+        spectrum_file = __split_merox_scan_number(scan_nr_and_file)[1]
     except Exception as e:
         raise RuntimeError(
             f"Could not spectrum file name from {scan_nr_and_file}!"
@@ -470,6 +557,12 @@ def read_merox(
     -----
     Uses ``pepScore1`` as the score for the alpha peptide, ``pepScore2`` as the score of the
     beta peptide, and ``Score`` as the score of the crosslink-spectrum-match.
+    If MeroX reports a range of merged scans, the first scan number is used. If the scan
+    number is reported without a spectrum file, the spectrum file is an empty string.
+    Spectrum titles of SCIEX files, e.g. ``'Locus:1.1.1.1409.10 File:"run.wiff"'``, and of
+    Bruker timsTOF files, e.g. ``"11238 +MS2(650.0308), ... #17538-17540|...|Id=11238|...~run"``,
+    contain no scan number: the scan number is ``None`` and the spectrum file is the whole title,
+    which identifies the spectrum. StavroX writes the scan number as ``file|scan``.
 
     Warnings
     --------

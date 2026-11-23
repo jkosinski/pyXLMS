@@ -72,9 +72,11 @@ class CrosslinkSpectrumMatch(BaseModel):
         The position of the crosslinker in the sequence of the second peptide (1-based).
     spectrum_file : str
         Name of the spectrum file the crosslink-spectrum-match was identified in.
-    scan_nr : int
+    scan_nr : int, or None
         The corresponding scan number of the crosslink-spectrum-match. If the scan number
-        is not available the spectrum index should be provided.
+        is not available the spectrum index should be provided. ``None`` if neither is
+        available, e.g. for a spectrum named only by its title: ``spectrum_file`` then holds
+        the title and identifies the spectrum alone.
 
     Optional
     ^^^^^^^^
@@ -205,7 +207,7 @@ class CrosslinkSpectrumMatch(BaseModel):
     Name of the spectrum file the crosslink-spectrum-match was identified in.
     """
     scan_nr: Annotated[
-        int,
+        Optional[int],
         Field(
             frozen=True,
             description="The corresponding scan number of the crosslink-spectrum-match.",
@@ -213,7 +215,9 @@ class CrosslinkSpectrumMatch(BaseModel):
     ]
     r"""
     The corresponding scan number of the crosslink-spectrum-match. If the scan number
-    is not available the spectrum index should be provided.
+    is not available the spectrum index should be provided. ``None`` if neither is
+    available, e.g. for a spectrum named only by its title: ``spectrum_file`` then holds
+    the title and identifies the spectrum alone.
     """
     alpha_modifications: Annotated[
         Optional[Dict[int, Tuple[str, float]]],
@@ -423,6 +427,7 @@ class CrosslinkSpectrumMatch(BaseModel):
                 self.beta_score is not None,
                 self.beta_decoy is not None,
                 self.score is not None,
+                self.scan_nr is not None,
                 self.charge is not None,
                 self.retention_time is not None,
                 self.ion_mobility is not None,
@@ -1062,7 +1067,7 @@ def create_csm(
     decoy_b: Optional[bool],
     score: Optional[float],
     spectrum_file: str,
-    scan_nr: int,
+    scan_nr: Optional[int],
     charge: Optional[int],
     rt: Optional[float],
     im_cv: Optional[float],
@@ -1115,8 +1120,9 @@ def create_csm(
         Score of the crosslink-spectrum-match.
     spectrum_file : str
         Name of the spectrum file the crosslink-spectrum-match was identified in.
-    scan_nr : int
-        The corresponding scan number of the crosslink-spectrum-match.
+    scan_nr : int, or None
+        The corresponding scan number of the crosslink-spectrum-match, or None if the spectrum
+        is identified by ``spectrum_file`` alone.
     charge : int, or None
         The precursor charge of the corresponding mass spectrum of the crosslink-spectrum-match.
     rt : float, or None
@@ -1241,7 +1247,7 @@ def create_csm_min(
     peptide_b: str,
     xl_position_peptide_b: int,
     spectrum_file: str,
-    scan_nr: int,
+    scan_nr: Optional[int],
     **kwargs,
 ) -> CrosslinkSpectrumMatch:
     r"""Creates a crosslink-spectrum-match data structure from minimal input.
@@ -1263,8 +1269,9 @@ def create_csm_min(
         The position of the crosslinker in the sequence of the second peptide (1-based).
     spectrum_file : str
         Name of the spectrum file the crosslink-spectrum-match was identified in.
-    scan_nr : int
-        The corresponding scan number of the crosslink-spectrum-match.
+    scan_nr : int, or None
+        The corresponding scan number of the crosslink-spectrum-match, or None if the spectrum
+        is identified by ``spectrum_file`` alone.
     **kwargs
         Any additional parameters will be passed to ``data.create_csm()``.
 

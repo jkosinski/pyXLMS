@@ -285,6 +285,7 @@ def get_available_keys(
     score_b = True
     decoy_b = True
     score = True
+    scan_nr = True
     charge = True
     rt = True
     im_cv = True
@@ -355,6 +356,8 @@ def get_available_keys(
                     decoy_b = False
                 if data["score"] is None:
                     score = False
+                if data["scan_nr"] is None:
+                    scan_nr = False
                 if data["charge"] is None:
                     charge = False
                 if data["retention_time"] is None:
@@ -385,7 +388,7 @@ def get_available_keys(
             "crosslink_type": True,
             "score": score,
             "spectrum_file": True,
-            "scan_nr": True,
+            "scan_nr": scan_nr,
             "charge": charge,
             "retention_time": rt,
             "ion_mobility": im_cv,

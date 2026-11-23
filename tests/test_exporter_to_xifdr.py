@@ -113,3 +113,39 @@ def test6():
         match="Attribute .* is missing in at least one element but is required!",
     ):
         _df = to_xifdr(csms, filename=None)
+
+
+def test_csm_without_scan_number_is_not_exported():
+    # xiFDR needs a scan number, a spectrum named only by its title has none
+    from pyXLMS.data import create_csm
+    from pyXLMS.exporter import to_xifdr
+
+    csm = create_csm(
+        "KPEPTIDE",
+        None,
+        1,
+        ["Cas9"],
+        [1],
+        [1],
+        None,
+        False,
+        "PKEPTIDE",
+        None,
+        2,
+        ["Cas9"],
+        [10],
+        [9],
+        None,
+        True,
+        100.0,
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        None,
+        3,
+        None,
+        None,
+    )
+    with pytest.raises(
+        ValueError,
+        match="Attribute 'scan_nr' is missing in at least one element but is required!",
+    ):
+        _df = to_xifdr([csm], filename=None)

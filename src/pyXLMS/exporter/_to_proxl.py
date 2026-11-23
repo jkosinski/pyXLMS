@@ -402,7 +402,7 @@ def to_proxl(
 
     Exports a list of crosslink-spectrum-matches to ProXL format. The tool ProXL is accessible
     via the link `yeastrc.org/proxl_public <https://www.yeastrc.org/proxl_public/>`_.
-    Requires that ``charge`` and ``score`` fields are set for all crosslink-spectrum-matches.
+    Requires that ``charge``, ``scan_nr`` and ``score`` fields are set for all crosslink-spectrum-matches.
 
     Parameters
     ----------
@@ -520,7 +520,7 @@ def to_proxl(
             crosslinker_mass = modifications[crosslinker]
     if len(csms) == 0:
         raise ValueError("Provided crosslink-spectrum-matches contain no elements!")
-    _ok = check_available_keys(["score", "charge"], csms)
+    _ok = check_available_keys(["score", "charge", "scan_nr"], csms)
     fasta_name = (
         os.path.basename(fasta_filename)
         if fasta_filename_override is None

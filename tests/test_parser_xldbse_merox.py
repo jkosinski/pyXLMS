@@ -10,8 +10,11 @@ import pytest
 MEROX1 = "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.csv"
 MEROX2 = "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.zhrm"
 MEROX3 = "data/merox/cas11.csv"
+# excerpts of public PRIDE deposits PXD008348 and PXD015080 (rows copied verbatim)
+MEROX4 = "data/merox/PXD008348_Npl3HMT1_DSSO_R1_excerpt.zhrm"
+MEROX5 = "data/merox/PXD015080_N29_excerpt.zhrm"
 # excerpt of public PRIDE deposit PXD025064 (rows copied verbatim)
-MEROX4 = "data/merox/PXD025064_AGAL_300DSBU_Fr7_excerpt.zhrm"
+MEROX7 = "data/merox/PXD025064_AGAL_300DSBU_Fr7_excerpt.zhrm"
 
 
 def test1():
@@ -467,11 +470,181 @@ def test7():
 
 
 def test8():
+    # scan number without spectrum file, e.g. "8464"
+    from pyXLMS.parser import read_merox
+
+    pr = read_merox(MEROX4, crosslinker="DSSO")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert [csm["spectrum_file"] for csm in csms] == ["", "", ""]
+    assert [csm["scan_nr"] for csm in csms] == [8464, 9519, 10115]
+    assert [csm["retention_time"] for csm in csms] == pytest.approx(
+        [1875.0, 2081.0, 2192.0]
+    )
+    assert csms[0]["alpha_peptide"] == "DSATEKTK"
+    assert csms[0]["beta_peptide"] == "LTAKR"
+
+
+def test9():
+    # spectrum title with raw file and native id, with and without leading "(-1)"
+    from pyXLMS.parser import read_merox
+
+    pr = read_merox(MEROX5, crosslinker="HSAKp", parse_modifications=False)
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 4
+    assert [csm["spectrum_file"] for csm in csms] == [
+        "20190726_stamch_BSA_HSAKp_MODDE_N29"
+    ] * 4
+    assert [csm["scan_nr"] for csm in csms] == [10031, 10529, 10498, 10539]
+    assert [csm["charge"] for csm in csms] == [4, 5, 4, 4]
+
+
+@pytest.mark.parametrize(
+    "scan_nr_and_file,scan_nr,spectrum_file",
+    [
+        (
+            "10061~XLpeplib_Beveridge_QEx-HFX_DSS_R1",
+            10061,
+            "XLpeplib_Beveridge_QEx-HFX_DSS_R1",
+        ),
+        ("7755", 7755, ""),
+        ("9512-9606", 9512, ""),
+        (
+            "10005-10006~f3-1828-MS2MS2-rhogrk-mc4-01",
+            10005,
+            "f3-1828-MS2MS2-rhogrk-mc4-01",
+        ),
+        (
+            "(-1) 10263-10264~f3-1828-MS2MS2-rhogrk-mc4-01",
+            10263,
+            "f3-1828-MS2MS2-rhogrk-mc4-01",
+        ),
+        (
+            '(-1) 20190726_stamch_BSA_HSAKp_MODDE_N29.10031.10031.4 File:"20190726_stamch_BSA_HSAKp_MODDE_N29.raw", '
+            'NativeID:"controllerType=0 controllerNumber=1 scan=10031"',
+            10031,
+            "20190726_stamch_BSA_HSAKp_MODDE_N29",
+        ),
+        (
+            'X-link_trypsin_Craig.3721.3721.2 File:"X-link_trypsin_Craig.raw", '
+            'NativeID:"controllerType=0 controllerNumber=1 scan=3721"',
+            3721,
+            "X-link_trypsin_Craig",
+        ),
+        (
+            "NS=2247,2252,2254-2257~APX-BA5_100DSBU_S1-C1_1_4266.d_unsorted",
+            2247,
+            "APX-BA5_100DSBU_S1-C1_1_4266.d_unsorted",
+        ),
+        (
+            "NS=sn10318~6b705f9e9cdedd27___Xpl1_001268.raw.-1",
+            10318,
+            "6b705f9e9cdedd27___Xpl1_001268.raw.-1",
+        ),
+        (
+            'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+            None,
+            'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        ),
+        # spectrum title with annotations (PRIDE deposit PXD031339)
+        (
+            'QE35501LM.1633.1633.4 MSn:"707.854395877474" RTmin:"16.776091999999998" '
+            'File:"QE35501LM.raw", NativeID:"controllerType=0 controllerNumber=1 scan=1633"',
+            1633,
+            "QE35501LM",
+        ),
+        # the same scan number written with leading zeros
+        (
+            'run.001633.001633.4 File:"run.raw", NativeID:"controllerType=0 scan=1633"',
+            1633,
+            "run",
+        ),
+        # StavroX (PRIDE deposit PXD028039)
+        ("3324_AJ_Dimer-Tryp|3953", 3953, "3324_AJ_Dimer-Tryp"),
+        # Bruker timsTOF (PRIDE deposit PXD027234), no scan number
+        (
+            "(-1) 11238 +MS2(650.0308), 32.6eV, 52.2min, 1/K0=0.850 #17538-17540|"
+            "count(pasefframemsmsinfo.precursor)=3|delta=25|Id=11238|AverageMz=650.4381726071|"
+            "MonoisotopicMz=650.030798142347|Charge=3|Intensity=7751|"
+            "ScanNumber=1161.06182295069~BSA_DSAU125_1",
+            None,
+            "11238 +MS2(650.0308), 32.6eV, 52.2min, 1/K0=0.850 #17538-17540|"
+            "count(pasefframemsmsinfo.precursor)=3|delta=25|Id=11238|AverageMz=650.4381726071|"
+            "MonoisotopicMz=650.030798142347|Charge=3|Intensity=7751|"
+            "ScanNumber=1161.06182295069~BSA_DSAU125_1",
+        ),
+        (
+            "10067, 10078 +MS2(647.7008), 35.6eV, 53.6min, 1/K0=0.858 #17593-17607|"
+            "Id=10067|Charge=3~Ribosome_DSBU_1",
+            None,
+            "10067, 10078 +MS2(647.7008), 35.6eV, 53.6min, 1/K0=0.858 #17593-17607|"
+            "Id=10067|Charge=3~Ribosome_DSBU_1",
+        ),
+        # no spectrum title (PRIDE deposit PXD021872)
+        ("N/A", None, ""),
+    ],
+)
+def test10(scan_nr_and_file, scan_nr, spectrum_file):
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_scan_number
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_spectrum_file
+
+    assert __get_merox_scan_number(scan_nr_and_file) == scan_nr
+    assert __get_merox_spectrum_file(scan_nr_and_file) == spectrum_file
+
+
+def test11():
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_scan_number
+
+    with pytest.raises(RuntimeError, match="Could not scan number from"):
+        _ = __get_merox_scan_number('scan File:"run.raw"')
+
+
+def test_merox_sciex_spectrum_titles():
+    # SCIEX spectrum titles (PRIDE deposit PXD024519) contain no scan number, the whole
+    # title identifies the spectrum
+    import io
+    from pyXLMS.parser import read_merox
+    from pyXLMS.transform import unique
+
+    titles = [
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        'Locus:1.1.1.2950.17 File:"TB05_M1.wiff"',
+        'Locus:1.1.1.2951.18 File:"TB05_M1.wiff"',
+    ]
+    with open(MEROX1, "r", encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    rows = [lines[0]]
+    for line, title in zip(lines[1:4], titles):
+        cells = line.split(";")
+        cells[14] = title
+        rows.append(";".join(cells))
+    pr = read_merox(io.BytesIO("\n".join(rows).encode("utf-8")), crosslinker="DSS")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert [csm["spectrum_file"] for csm in csms] == titles
+    assert [csm["scan_nr"] for csm in csms] == [None, None, None]
+    assert [csm["completeness"] for csm in csms] == ["partial"] * 3
+    best = unique(csms)
+    assert len(best) == 2
+    assert [csm["spectrum_file"] for csm in best] == [titles[0], titles[2]]
+    assert best[0]["score"] == pytest.approx(151)
+
+
+def test_merox_scan_number_of_title_and_native_id_differ():
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_scan_number
+
+    with pytest.raises(RuntimeError, match="Could not scan number from"):
+        _ = __get_merox_scan_number(
+            'run.1633.1633.4 File:"run.raw", NativeID:"controllerType=0 scan=1634"'
+        )
+
+
+def test14():
     # protein-terminal peptides: "{" protein N-terminus, "}" protein C-terminus
     from pyXLMS.parser import read_merox
     from pyXLMS.transform import modifications_to_str as mts
 
-    pr = read_merox(MEROX4, crosslinker="DSBU")
+    pr = read_merox(MEROX7, crosslinker="DSBU")
     csms = pr["crosslink-spectrum-matches"]
     assert len(csms) == 3
 
@@ -518,7 +691,7 @@ def test8():
         ("K1", 135, "[KYLLS}", 1, 135),
     ],
 )
-def test9(position_str, from_position, sequence, xl_position, pep_position):
+def test15(position_str, from_position, sequence, xl_position, pep_position):
     from pyXLMS.parser._parser_xldbse_merox import __get_merox_crosslink_position
     from pyXLMS.parser._parser_xldbse_merox import __get_merox_peptide_position
 

@@ -434,3 +434,20 @@ def test15():
         match=r"Attribute 'score' is missing in at least one element but is required!",
     ):
         _ = check_available_keys(["score"], data_list)
+
+
+def test_available_keys_csm_without_scan_number():
+    from pyXLMS import transform
+    from pyXLMS import data
+
+    data_list = [
+        data.create_csm_min("PEPK", 4, "PKEP", 2, "RUN_1", 1),
+        data.create_csm_min(
+            "KPEP", 1, "PEKP", 3, 'Locus:1.1.1.2950.17 File:"R.wiff"', None
+        ),
+    ]
+    k = transform.get_available_keys(data_list)
+
+    assert k["spectrum_file"]
+    assert not k["scan_nr"]
+    assert transform.get_available_keys(data_list[:1])["scan_nr"]
