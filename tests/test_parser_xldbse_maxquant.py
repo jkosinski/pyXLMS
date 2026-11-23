@@ -11,6 +11,8 @@ MAXQUANT1 = "data/maxquant/run1/crosslinkMsms.txt"
 MAXQUANT2 = "data/maxquant/run2/crosslinkMsms.txt"
 # excerpt of public PRIDE deposit PXD044723 (rows copied verbatim)
 MAXQUANT3 = "data/maxquant/PXD044723_crosslinkMsms_excerpt.txt"
+# excerpt of public PRIDE deposit PXD027159, MaxQuant 2.0.4 (rows copied verbatim)
+MAXQUANT4 = "data/maxquant/PXD027159_DSBU_crosslinkMsms_excerpt.txt"
 
 
 def test1():
@@ -364,3 +366,20 @@ def test5():
     assert csm["beta_proteins"] == ["D1D2"]
     assert csm["beta_proteins_crosslink_positions"] == [357]
     assert csm["crosslink_type"] == "inter"
+
+
+def test6():
+    # MaxQuant 2.0.4 writes "Peptide index of Crosslink1" without the space
+    from pyXLMS.parser import read_maxquant
+
+    pr = read_maxquant(MAXQUANT4, crosslinker="DSBU")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "DKQSGK"
+    assert csm["alpha_peptide_crosslink_position"] == 2
+    assert csm["alpha_proteins_crosslink_positions"] == [677]
+    assert csm["beta_peptide"] == "HSIKK"
+    assert csm["beta_peptide_crosslink_position"] == 4
+    assert csm["beta_proteins_crosslink_positions"] == [48]
+    assert csm["scan_nr"] == 2622

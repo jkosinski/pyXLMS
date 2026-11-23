@@ -139,7 +139,8 @@ def __get_maxquant_crosslink_index(
     r"""Helper function to get the protein or peptide crosslink index from MaxQuant/MaxLynx.
 
     Reads the crosslink index from the columns ``Protein index of Crosslink 1`` or
-    ``Peptide index of Crosslink 1`` (and ``2``). Other MaxQuant/MaxLynx versions write
+    ``Peptide index of Crosslink 1`` (and ``2``), which MaxQuant 2.0.4 writes without the space
+    for the first peptide, ``Peptide index of Crosslink1``. Other MaxQuant/MaxLynx versions write
     them as ``Pro_InterLink1`` or ``Pep_InterLink1`` (and ``2``) with values terminated by
     a semicolon, e.g. ``"64;"``, in that case the first index is returned.
 
@@ -168,9 +169,12 @@ def __get_maxquant_crosslink_index(
     -----
     This function should not be called directly, it is called from ``read_maxquant()``.
     """
-    column = f"{'Protein' if protein else 'Peptide'} index of Crosslink {crosslink}"
-    if column in row.index:
-        return __parse_int(row[column])
+    for column in [
+        f"{'Protein' if protein else 'Peptide'} index of Crosslink {crosslink}",
+        f"{'Protein' if protein else 'Peptide'} index of Crosslink{crosslink}",
+    ]:
+        if column in row.index:
+            return __parse_int(row[column])
     column = f"{'Pro' if protein else 'Pep'}_InterLink{crosslink}"
     return __parse_int(str(row[column]).split(";")[0])
 
