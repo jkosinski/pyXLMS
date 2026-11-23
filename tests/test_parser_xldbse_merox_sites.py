@@ -111,3 +111,51 @@ def test8():
     site = parse_site_from_merox("[AKKR]", "DEC_>A and DEC_>B@10-13", 10, "K2")
     assert len(site["proteins"]) == 2
     assert site["protein_positions"] is None
+
+
+@pytest.mark.parametrize(
+    "peptide,start,end,positions",
+    [
+        # not placed by MeroX, e.g. in PRIDE deposits PXD012546 and PXD032739
+        ("[SIBMHTKKR]", 0, 0, None),
+        ("[GGYDSPR]", "0", "0", None),
+        # placed
+        ("[GGYDSPR]", 345, 351, [349]),
+        ("[GGYDSPR]", 345, None, [349]),
+    ],
+)
+def test9(peptide, start, end, positions):
+    from pyXLMS.parser import parse_site_from_merox
+
+    site = parse_site_from_merox(
+        peptide, ">A(>B/>C)", start, "S5", parse_modifications=False, peptide_end=end
+    )
+    assert site["proteins"] == ["A"]
+    assert site["protein_positions"] == positions
+
+
+def test10(tmp_path):
+    # peptides with start and end 0 are read without protein positions
+    import pandas as pd
+    from pyXLMS.parser import read_merox
+
+    data = pd.read_csv(
+        "data/merox/XLpeplib_Beveridge_QEx-HFX_DSS_R1.csv", sep=";"
+    ).head(2)
+    data.loc[0, "From"] = 0
+    data.loc[0, "To"] = 0
+    file = tmp_path / "unplaced.csv"
+    data.to_csv(file, sep=";", index=False)
+    with pytest.warns(
+        RuntimeWarning, match=r"Read 1 peptide\(s\) that MeroX did not place"
+    ):
+        pr = read_merox(str(file), crosslinker="DSS")
+    csms = pr["crosslink-spectrum-matches"]
+    unplaced = [
+        side
+        for side in ("alpha", "beta")
+        if csms[0][f"{side}_proteins_crosslink_positions"] is None
+    ]
+    assert len(unplaced) == 1
+    assert csms[0][f"{unplaced[0]}_proteins_peptide_positions"] is None
+    assert csms[1]["alpha_proteins_crosslink_positions"] is not None

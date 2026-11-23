@@ -771,7 +771,7 @@ def test_merox_decoy_without_position():
         header, row = f.readline(), f.readline()
     placed = row.replace(";>Cas9;531;539;", ";DEC_>Cas9;531;539;", 1)
     unplaced = row.replace(";>Cas9;531;539;", ";DEC_>Cas9;0;0;", 1)
-    target_at_zero = row.replace(";>Cas9;531;539;", ";>Cas9;0;0;", 1)
+    target_at_zero = row.replace(";>Cas9;531;539;", ";>Cas9;0;9;", 1)
     assert len({row, placed, unplaced, target_at_zero}) == 4
     with pytest.warns(RuntimeWarning, match="Read 1 decoy peptide"):
         pr = read_merox(
@@ -791,7 +791,8 @@ def test_merox_decoy_without_position():
     assert unplaced_csm["beta_proteins_peptide_positions"] is None
     assert unplaced_csm["alpha_proteins_crosslink_positions"] == [870]
     assert not unplaced_csm["alpha_decoy"]
-    # a target peptide at start 0 is still an error: only decoys go unplaced
+    # a target peptide at start 0 that ends after it is still an error: only decoys, and
+    # peptides with start and end 0, go unplaced
     with pytest.raises(ValueError, match="0-based"):
         read_merox(
             io.StringIO(header + target_at_zero),

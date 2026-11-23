@@ -656,6 +656,34 @@ def __get_merox_retention_time(
     return rt
 
 
+def __is_merox_unplaced(peptide_start: Any, peptide_end: Any) -> bool:
+    r"""Helper function to determine if MeroX did not place a peptide in a protein.
+
+    MeroX writes peptide start and end ``0`` (columns "From" and "To") for a peptide it did
+    not place in a protein, e.g. one of several proteins in parentheses. A protein
+    N-terminal peptide also starts at ``0``, but ends after its last residue.
+
+    Parameters
+    ----------
+    peptide_start : any
+        The peptide start from MeroX e.g. from column "From".
+    peptide_end : any
+        The peptide end from MeroX e.g. from column "To", or ``None`` if not known.
+
+    Returns
+    -------
+    bool
+        If the peptide has start and end ``0``.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_merox()``.
+    """
+    if peptide_end is None:
+        return False
+    return __parse_int(peptide_start) == 0 and __parse_int(peptide_end) == 0
+
+
 def parse_site_from_merox(
     peptide: str,
     protein: str,
@@ -663,6 +691,7 @@ def parse_site_from_merox(
     position: str,
     parse_modifications: bool = True,
     modifications: Dict[str, Dict[str, Any]] = MEROX_MODIFICATION_MAPPING,
+    peptide_end: Any = None,
 ) -> Dict[str, Any]:
     r"""Parse a MeroX peptide, protein, start, and linkage position into a linked site.
 
@@ -686,6 +715,10 @@ def parse_site_from_merox(
     modifications: dict of str, dict of str, any, default = ``constants.MEROX_MODIFICATION_MAPPING``
         Mapping of modification symbols to their amino acids and modifications. Please refer to
         ``constants.MEROX_MODIFICATION_MAPPING`` for examples.
+    peptide_end : any, default = None
+        The end of the peptide in the protein e.g. from column "To". MeroX writes start and
+        end ``0`` for a peptide it did not place in a protein, which then has no protein
+        positions.
 
     Returns
     -------
@@ -694,7 +727,8 @@ def parse_site_from_merox(
         1-based, in-peptide), ``proteins`` (list of str, accessions) and ``protein_positions``
         (list of int, 1-based, absolute; parallel to ``proteins``). For a peptide shared by
         several proteins, or found several times in one (accessions joined by ``" and "``),
-        the protein positions are ``None``: MeroX reports one position of the peptide only.
+        the protein positions are ``None``: MeroX reports one position of the peptide only. They
+        are also ``None`` for a peptide with start and end ``0`` (see ``peptide_end``).
 
     Raises
     ------
@@ -724,6 +758,7 @@ def parse_site_from_merox(
         "proteins": __get_merox_protein(str(protein)),
         "protein_positions": None
         if len(__split_merox_shared_proteins(str(protein))) > 1
+        or __is_merox_unplaced(peptide_start, peptide_end)
         else [
             __get_merox_peptide_position(peptide_start, str(peptide))
             + peptide_position
@@ -805,6 +840,8 @@ def read_merox(
     ``">sp|P0DMV9|HS71B_HUMAN and >sp|P0DMV8|HS71A_HUMAN@510-517"``) is read with all of its
     proteins and without protein positions, since MeroX reports the position in one of the
     proteins only; their number is reported in a warning.
+    A peptide that MeroX did not place in a protein, with start and end ``0`` (columns "From"
+    and "To"), is read without protein positions; their number is reported in a warning.
 
     Warnings
     --------
@@ -858,6 +895,7 @@ def read_merox(
     skipped_looplinks = 0
     unplaced_decoys = 0
     shared_peptides = 0
+    unplaced_peptides = 0
 
     ## handle input
     if not isinstance(files, list):
@@ -888,6 +926,7 @@ def read_merox(
                 row["best linkage position peptide 1"],
                 parse_modifications,
                 modifications,
+                row["To"] if "To" in row.index else None,
             )
             site_b = parse_site_from_merox(
                 row["Peptide2"],
@@ -896,6 +935,7 @@ def read_merox(
                 row["best linkage position peptide 2"],
                 parse_modifications,
                 modifications,
+                row["To.1"] if "To.1" in row.index else None,
             )
             # decoy peptides that MeroX could not place in their decoy protein
             unplaced_a = __is_merox_unplaced_decoy(
@@ -905,8 +945,13 @@ def read_merox(
                 str(row["Protein 2"]), row["From.1"], str(row["Peptide2"]), decoy_prefix
             )
             unplaced_decoys += int(unplaced_a) + int(unplaced_b)
-            shared_peptides += int(site_a["protein_positions"] is None) + int(
-                site_b["protein_positions"] is None
+            shared_peptides += int(
+                len(__split_merox_shared_proteins(str(row["Protein 1"]))) > 1
+            ) + int(len(__split_merox_shared_proteins(str(row["Protein 2"]))) > 1)
+            unplaced_peptides += int(
+                not unplaced_a and __is_merox_unplaced(row["From"], row.get("To"))
+            ) + int(
+                not unplaced_b and __is_merox_unplaced(row["From.1"], row.get("To.1"))
             )
             # create crosslink
             csm = create_csm(
@@ -982,7 +1027,15 @@ def read_merox(
             ),
             stacklevel=2,
         )
-    ## report peptides shared by several proteins
+    ## report peptides not placed in a protein and shared by several proteins
+    if unplaced_peptides > 0:
+        warnings.warn(
+            RuntimeWarning(
+                f"Read {unplaced_peptides} peptide(s) that MeroX did not place in a protein "
+                "(start and end 0) without protein positions!"
+            ),
+            stacklevel=2,
+        )
     if shared_peptides > 0:
         warnings.warn(
             RuntimeWarning(
