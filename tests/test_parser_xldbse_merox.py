@@ -15,6 +15,8 @@ MEROX4 = "data/merox/PXD008348_Npl3HMT1_DSSO_R1_excerpt.zhrm"
 MEROX5 = "data/merox/PXD015080_N29_excerpt.zhrm"
 # excerpt of public PRIDE deposit PXD025064 (rows copied verbatim)
 MEROX7 = "data/merox/PXD025064_AGAL_300DSBU_Fr7_excerpt.zhrm"
+# excerpt of public PRIDE deposit PXD033205 (rows copied verbatim)
+MEROX9 = "data/merox/PXD033205_Day0_DSBU_1_excerpt.zhrm"
 
 
 def test1():
@@ -697,3 +699,138 @@ def test15(position_str, from_position, sequence, xl_position, pep_position):
 
     assert __get_merox_crosslink_position(position_str) == xl_position
     assert __get_merox_peptide_position(from_position, sequence) == pep_position
+
+
+# the letters of PXD033205's properties.mxf: "Acetylation N-Term;X;C2OH2" with the static
+# modification "{;X", and "Methionine oxidized;J;C5H9NO2S" with the variable modification "M;J;2"
+MEROX9_MODIFICATIONS = {
+    "J": {"Amino Acid": "M", "Modification": ("Methionine oxidized", 15.994915)},
+    "X": {"Amino Acid": "{", "Modification": ("Acetylation N-Term", 42.010565)},
+}
+
+
+def test_merox_protein_n_terminal_group():
+    # "[XMDVFMKGLSK]" From 0: X is the acetylated protein N-terminus, counted as position 1
+    from pyXLMS.parser import read_merox
+    from pyXLMS.constants import MEROX_MODIFICATION_MAPPING
+    from pyXLMS.transform import modifications_to_str as mts
+
+    pr = read_merox(
+        MEROX9,
+        crosslinker="DSBU",
+        modifications={**MEROX_MODIFICATION_MAPPING, **MEROX9_MODIFICATIONS},
+    )
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+
+    # [AKEGVVAAAEKTK] K11 - [XMDVFMKGLSK] K7
+    csm = csms[0]
+    assert csm["alpha_peptide"] == "AKEGVVAAAEKTK"
+    assert csm["alpha_proteins_crosslink_positions"] == [21]
+    assert csm["beta_peptide"] == "MDVFMKGLSK"
+    assert csm["beta_peptide_crosslink_position"] == 6
+    assert (
+        mts(csm["beta_modifications"])
+        == "(0:[Acetylation N-Term|42.010565]);(6:[DSBU|196.08479231])"
+    )
+    assert csm["beta_proteins"] == ["sp|P37840|SYUA_N14"]
+    assert csm["beta_proteins_crosslink_positions"] == [6]
+    assert csm["beta_proteins_peptide_positions"] == [1]
+
+    # [XMDVFMKGLSK] K7 - [AAGKTKE] K4
+    csm = csms[1]
+    assert csm["alpha_peptide"] == "AAGKTKE"
+    assert csm["alpha_proteins_crosslink_positions"] == [32]
+    assert csm["beta_peptide"] == "MDVFMKGLSK"
+    assert csm["beta_peptide_crosslink_position"] == 6
+    assert csm["beta_proteins_crosslink_positions"] == [6]
+    assert csm["beta_proteins_peptide_positions"] == [1]
+
+    # [XMDVFJKGLSK] K7 - [KTKQGVAE] K3
+    csm = csms[2]
+    assert csm["beta_peptide"] == "MDVFMKGLSK"
+    assert csm["beta_peptide_crosslink_position"] == 6
+    assert mts(csm["beta_modifications"]) == (
+        "(0:[Acetylation N-Term|42.010565]);(5:[Methionine oxidized|15.994915]);"
+        "(6:[DSBU|196.08479231])"
+    )
+    assert csm["beta_proteins_crosslink_positions"] == [6]
+    assert csm["beta_proteins_peptide_positions"] == [1]
+
+
+def test_merox_protein_n_terminal_group_without_modifications():
+    from pyXLMS.parser import read_merox
+    from pyXLMS.constants import MEROX_MODIFICATION_MAPPING
+
+    pr = read_merox(
+        MEROX9,
+        crosslinker="DSBU",
+        parse_modifications=False,
+        modifications={**MEROX_MODIFICATION_MAPPING, **MEROX9_MODIFICATIONS},
+    )
+    csm = pr["crosslink-spectrum-matches"][2]
+    assert csm["beta_peptide"] == "MDVFMKGLSK"
+    assert csm["beta_modifications"] is None
+    assert csm["beta_peptide_crosslink_position"] == 6
+    assert csm["beta_proteins_crosslink_positions"] == [6]
+    assert csm["beta_proteins_peptide_positions"] == [1]
+
+
+def test_merox_protein_n_terminal_group_not_mapped():
+    # without the letter of the N-terminus, e.g. in an exported table without the settings
+    from pyXLMS.parser import read_merox
+    from pyXLMS.constants import MEROX_MODIFICATION_MAPPING
+
+    with pytest.raises(ValueError, match=r"MeroX peptide \[XMDVFMKGLSK\] starts at"):
+        _ = read_merox(
+            MEROX9,
+            crosslinker="DSBU",
+            modifications={
+                **MEROX_MODIFICATION_MAPPING,
+                "J": MEROX9_MODIFICATIONS["J"],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "sequence,position_str,expected_sequence,group,xl_position",
+    [
+        pytest.param(
+            "[XMDVFMKGLSK]",
+            "K7",
+            "{MDVFMKGLSK]",
+            ("Acetylation N-Term", 42.010565),
+            6,
+            id="group",
+        ),
+        pytest.param("[KTKQGVAE]", "K3", "[KTKQGVAE]", None, 3, id="no-group"),
+        pytest.param("{MSKTAVK]", "{0", "{MSKTAVK]", None, 1, id="protein-n-term"),
+        pytest.param("[AXK]", "K3", "[AXK]", None, 3, id="letter-not-first"),
+    ],
+)
+def test_merox_protein_n_terminal_group_helpers(
+    sequence, position_str, expected_sequence, group, xl_position
+):
+    from pyXLMS.parser._parser_xldbse_merox import (
+        __get_merox_protein_n_terminal_group,
+        __get_merox_group_crosslink_position,
+    )
+
+    parsed_sequence, parsed_group = __get_merox_protein_n_terminal_group(
+        sequence, MEROX9_MODIFICATIONS
+    )
+    assert parsed_sequence == expected_sequence
+    assert parsed_group == group
+    assert (
+        __get_merox_group_crosslink_position(position_str, parsed_group) == xl_position
+    )
+
+
+@pytest.mark.parametrize("position_str", ["X1", "{0"])
+def test_merox_crosslink_on_protein_n_terminal_group(position_str):
+    from pyXLMS.parser._parser_xldbse_merox import __get_merox_group_crosslink_position
+
+    with pytest.raises(ValueError, match="is on the modified protein N-terminus"):
+        __get_merox_group_crosslink_position(
+            position_str, ("Acetylation N-Term", 42.010565)
+        )
