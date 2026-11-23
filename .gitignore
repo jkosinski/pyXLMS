@@ -171,3 +171,43 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Files written to the repository root by the test suite
+/6YHU_PyXlinkViewer.txt
+/6YHU_mapping.txt
+/6YHU_parsedPDB.txt
+/6YHU_sequence.fasta
+/6YHU_xlms-tools.txt
+/CSM.csv
+/CSM.parquet
+/CSMS_exported_to_ProXL.xml
+/Cas9_AlphaLink2.fasta
+/Cas9_AlphaLink2.pickle
+/Cas9_AlphaLink2.txt
+/DSS_Cas9_ProXL.xml
+/XL.csv
+/XL.parquet
+/crosslinks.csv
+/crosslinks.xlsx
+/crosslinksForXLinkDB.tsv
+/crosslinks_xiNET.csv
+/crosslinks_xiVIEW.csv
+/crosslinks_xmas.xlsx
+/csms.csv
+/csms.json
+/csms.xlsx
+/export_toxinet.csv
+/export_toxiview.csv
+/export_toxiview_min.csv
+/msannika_CSMs_for_xiFDR.csv
+/msannika_xiFDR.csv
+/offline.xml
+/online.xml
+/test_mapping.txt
+/test_parsedPDB.txt
+/test_sequence.fasta
+/test_xlms-tools.txt
+/xi_csms_to_annika.csv
+/xi_xls_to_annika.xlsx
+/xiview_csms.csv
+/xls.json
