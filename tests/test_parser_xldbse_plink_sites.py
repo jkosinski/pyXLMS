@@ -82,3 +82,34 @@ def test7():
     assert site_b["peptide"] == "AEVQK"
     assert site_b["proteins"] == ["sp|Q14240-2|IF4A2", "sp|Q14240|IF4A2"]
     assert site_b["protein_positions"] == [148, 147]
+
+
+def test8():
+    # protein names containing parentheses, e.g. in PRIDE deposit PXD034327
+    from pyXLMS.parser import parse_sites_from_plink
+
+    site_a, site_b = parse_sites_from_plink(
+        "QNVADSVEKGLTEENVK(9)-WDEAAVNLAKSR(10)",
+        "PRex1_DH-PH(T4L)(90)-PRex1_DH-PH(T4L)(440)/",
+    )
+    assert site_a["proteins"] == ["PRex1_DH-PH(T4L)"]
+    assert site_a["protein_positions"] == [90]
+    assert site_b["proteins"] == ["PRex1_DH-PH(T4L)"]
+    assert site_b["protein_positions"] == [440]
+
+
+def test9():
+    # excerpt of public PRIDE deposit PXD034327 (rows copied verbatim)
+    from pyXLMS.parser import read_plink
+
+    pr = read_plink("data/plink2/PXD034327_PRex1_DH-PH_T4L_spectra_excerpt.csv")
+    csms = pr["crosslink-spectrum-matches"]
+    assert len(csms) == 3
+    assert csms[0]["alpha_proteins"] == ["PRex1_DH-PH(T4L)"]
+    assert csms[0]["beta_proteins"] == ["PRex1_DH-PH(T4L)"]
+    assert sorted(
+        [
+            csms[0]["alpha_proteins_crosslink_positions"][0],
+            csms[0]["beta_proteins_crosslink_positions"][0],
+        ]
+    ) == [90, 440]

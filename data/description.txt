@@ -26,6 +26,7 @@ FILETREE                                                                        
 ¦       Cas9_plus10_2024.06.20.filtered_cross-linked_peptides.csv               | pLink         | DSS
 ¦       Cas9_plus10_2024.06.20.filtered_cross-linked_sites.csv                  | NOT SUPPORTED |
 ¦       Cas9_plus10_2024.06.20.filtered_cross-linked_spectra.csv                | pLink         | DSS
+¦       PXD034327_PRex1_DH-PH_T4L_spectra_excerpt.csv                           | pLink         | BS3
 ¦                                                                               |               |
 +---plink3                                                                      |               |
 ¦       Cas10_plus10_2025.04.07.filtered_cross-linked_peptides.csv              | pLink         | DSS

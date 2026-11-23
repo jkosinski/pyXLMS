@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import io
+import re
 import warnings
 import pandas as pd
 from tqdm import tqdm
@@ -152,6 +153,38 @@ def __parse_modifications_from_plink_modifications_str(
     return (modifications_a, modifications_b)  # ty: ignore[unsound-return-statement]
 
 
+def __split_plink_protein(protein: str) -> Tuple[str, int]:
+    r"""Helper function to split a pLink protein and its crosslink position.
+
+    Splits a pLink protein entry, e.g. ``"PROT (10)"``, into the protein and the crosslink
+    position, which is the number in the last parentheses. A protein name may contain
+    parentheses itself, e.g. ``"PRex1_DH-PH(T4L)(388)"``.
+
+    Parameters
+    ----------
+    protein : str
+        The pLink protein entry.
+
+    Returns
+    -------
+    tuple of str, int
+        The protein (as written before the position) and the crosslink position.
+
+    Raises
+    ------
+    ValueError
+        If the protein entry does not end with a position in parentheses.
+
+    Notes
+    -----
+    This function should not be called directly, it is called from ``read_plink()``.
+    """
+    match = re.fullmatch(r"(.*)\((\d+)\)\s*", protein, flags=re.DOTALL)
+    if match is None:
+        raise ValueError(f"Could not parse protein and position from {protein}!")
+    return match.group(1), __parse_int(match.group(2))
+
+
 @deprecated(
     "Function will be removed in pyXLMS v3.0.0 - please use parse_sites_from_plink instead!"
 )
@@ -203,15 +236,13 @@ def __parse_proteins_and_position_from_plink(
         proteins_set_b.add(protein_b)
     # get proteins a
     for protein in sorted(proteins_set_a):
-        acc = protein.split("(")[0]
-        pos = __parse_int(protein.split("(")[1].split(")")[0])
+        acc, pos = __split_plink_protein(protein)
         proteins_a.append(acc)
         proteins_a_xl_positions.append(pos)
         proteins_a_pep_positions.append(pos - xl_pos_a + 1)
     # get proteins b
     for protein in sorted(proteins_set_b):
-        acc = protein.split("(")[0]
-        pos = __parse_int(protein.split("(")[1].split(")")[0])
+        acc, pos = __split_plink_protein(protein)
         proteins_b.append(acc)
         proteins_b_xl_positions.append(pos)
         proteins_b_pep_positions.append(pos - xl_pos_b + 1)
@@ -310,19 +341,21 @@ def parse_sites_from_plink(
         {
             "peptide": peptides[0],
             "peptide_position": pep_positions[0],
-            "proteins": [token.split("(")[0].strip() for token in sorted(tokens[0])],
+            "proteins": [
+                __split_plink_protein(token)[0].strip() for token in sorted(tokens[0])
+            ],
             "protein_positions": [
-                __parse_int(token.split("(")[1].split(")")[0])
-                for token in sorted(tokens[0])
+                __split_plink_protein(token)[1] for token in sorted(tokens[0])
             ],
         },
         {
             "peptide": peptides[1],
             "peptide_position": pep_positions[1],
-            "proteins": [token.split("(")[0].strip() for token in sorted(tokens[1])],
+            "proteins": [
+                __split_plink_protein(token)[0].strip() for token in sorted(tokens[1])
+            ],
             "protein_positions": [
-                __parse_int(token.split("(")[1].split(")")[0])
-                for token in sorted(tokens[1])
+                __split_plink_protein(token)[1] for token in sorted(tokens[1])
             ],
         },
     )
